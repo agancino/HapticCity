@@ -109,14 +109,14 @@ class GameScene extends Phaser.Scene {
 
         // Título del Juego HUD
         this.add.text(20, 18, 'HAPTIC CITY', {
-            fontFamily: '"Press Start 2P", monospace',
+            fontFamily: 'monospace, Arial, sans-serif',
             fontSize: '14px',
             color: '#38bdf8'
         }).setScrollFactor(0).setDepth(hudDepth + 1);
 
         // Indicador del Sonido Actual
         this.soundIndicatorText = this.add.text(210, 20, 'AUDIO ACTIVO: Ninguno', {
-            fontFamily: 'Outfit, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '15px',
             fontWeight: '600',
             color: '#94a3b8'
@@ -128,7 +128,7 @@ class GameScene extends Phaser.Scene {
         resetBtnBg.setStrokeStyle(1, 0x64748b);
 
         const resetBtnLabel = this.add.text(width - 240, 28, '🔄 Reiniciar', {
-            fontFamily: 'Outfit, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '13px',
             color: '#ffffff'
         }).setOrigin(0.5).setScrollFactor(0).setDepth(hudDepth + 2);
@@ -144,7 +144,7 @@ class GameScene extends Phaser.Scene {
         muteBtnBg.setStrokeStyle(1, 0x38bdf8);
 
         this.muteBtnLabel = this.add.text(width - 110, 28, this.isMuted ? '🔇 Silenciado' : '🔊 Con Sonido', {
-            fontFamily: 'Outfit, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '13px',
             color: '#ffffff'
         }).setOrigin(0.5).setScrollFactor(0).setDepth(hudDepth + 2);
@@ -163,7 +163,7 @@ class GameScene extends Phaser.Scene {
             .setStrokeStyle(2, 0x38bdf8);
 
         this.toastText = this.add.text(0, 0, '', {
-            fontFamily: 'Outfit, sans-serif',
+            fontFamily: 'Arial, sans-serif',
             fontSize: '13px',
             color: '#f8fafc',
             align: 'center'

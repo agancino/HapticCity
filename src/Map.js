@@ -105,7 +105,7 @@ class CityMap {
 
         // Cartel del Hospital
         const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚑 HOSPITAL', {
-            fontFamily: '"Press Start 2P", monospace',
+            fontFamily: 'monospace, Arial, sans-serif',
             fontSize: '12px',
             color: '#ef4444',
             backgroundColor: '#0f172a',
@@ -151,7 +151,7 @@ class CityMap {
         }
 
         const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚓 POLICÍA', {
-            fontFamily: '"Press Start 2P", monospace',
+            fontFamily: 'monospace, Arial, sans-serif',
             fontSize: '12px',
             color: '#3b82f6',
             backgroundColor: '#0f172a',
@@ -195,7 +195,7 @@ class CityMap {
         }
 
         const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚒 BOMBEROS', {
-            fontFamily: '"Press Start 2P", monospace',
+            fontFamily: 'monospace, Arial, sans-serif',
             fontSize: '12px',
             color: '#f97316',
             backgroundColor: '#0f172a',
@@ -232,7 +232,7 @@ class CityMap {
         const zoneHeight = 4 * this.tileSize;
 
         const labelText = this.scene.add.text(zoneX, zoneY - 70, '🚗 CRUCE PRINCIPAL', {
-            fontFamily: '"Press Start 2P", monospace',
+            fontFamily: 'monospace, Arial, sans-serif',
             fontSize: '11px',
             color: '#facc15',
             backgroundColor: '#0f172a',
