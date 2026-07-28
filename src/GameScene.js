@@ -1,7 +1,7 @@
 /**
  * GameScene.js
  * Escena principal del juego Haptic City.
- * Integra la ciudad, el personaje, las zonas de disparo de audio, los controles táctiles/PC y el HUD superior.
+ * Integra la ciudad, el personaje, las zonas de disparo de audio continuo, controles y el HUD superior.
  */
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -39,9 +39,8 @@ class GameScene extends Phaser.Scene {
         // 7. Configurar Interfaz HUD Superior
         this.createHUD();
 
-        // 8. Zona de Notificación de Sonido Activo
-        this.currentActiveSound = 'Ninguno (Camina por la ciudad)';
-        this.toastTimer = null;
+        // 8. Estado del sonido
+        this.currentActiveSound = 'Ninguno';
     }
 
     update() {
@@ -51,15 +50,17 @@ class GameScene extends Phaser.Scene {
         const inputVector = this.inputManager.getInputVector();
         this.player.move(inputVector);
 
-        // Comprobar si el jugador está dentro de alguna de las 4 zonas de audio
+        // Comprobar si el jugador está dentro o fuera de las zonas de audio
         this.checkTriggerZones();
     }
 
     /**
-     * Revisa la superposición (Overlap) del jugador con las 4 zonas urbanas
+     * Revisa la posición del jugador respecto a las 4 zonas urbanas.
+     * Mantiene el audio activo continuamente mientras permanezca dentro y lo detiene al salir.
      */
     checkTriggerZones() {
         const playerPos = this.player.getPosition();
+        let insideAnyZone = false;
 
         this.cityMap.triggerZones.forEach(zone => {
             const left = zone.x - zone.width / 2;
@@ -67,17 +68,24 @@ class GameScene extends Phaser.Scene {
             const top = zone.y - zone.height / 2;
             const bottom = zone.y + zone.height / 2;
 
-            // Detección de colisión dentro de la caja delimitadora de la zona
+            // Detección de permanencia dentro de la caja delimitadora
             if (playerPos.x >= left && playerPos.x <= right && playerPos.y >= top && playerPos.y <= bottom) {
+                insideAnyZone = true;
                 this.audioManager.triggerZoneSound(zone, (triggeredZone) => {
                     this.showSoundNotification(triggeredZone);
                 });
             }
         });
+
+        // Si el jugador salió de todas las zonas, detener el sonido y limpiar la notificación
+        if (!insideAnyZone && this.audioManager.currentZoneId) {
+            this.audioManager.stopActiveZoneSound();
+            this.clearSoundNotification();
+        }
     }
 
     /**
-     * Muestra un mensaje discreto en pantalla indicando qué sonido fue emitido
+     * Muestra el estado activo del sonido en la UI
      */
     showSoundNotification(zoneData) {
         this.currentActiveSound = zoneData.name;
@@ -86,20 +94,22 @@ class GameScene extends Phaser.Scene {
             this.soundIndicatorText.setColor('#38bdf8');
         }
 
-        // Banner discreto flotante Toast
         if (this.toastContainer && this.toastText) {
             this.toastContainer.setVisible(true);
-            this.toastText.setText(`🔔 REPRODUCIENDO: ${zoneData.name}\n(Señal enviada a pulsera háptica)`);
+            this.toastText.setText(`🔔 REPRODUCIENDO: ${zoneData.name}\n(Señal emitida para pulsera háptica)`);
+        }
+    }
 
-            if (this.toastTimer) this.toastTimer.remove();
-
-            this.toastTimer = this.time.delayedCall(3000, () => {
-                this.toastContainer.setVisible(false);
-                if (this.soundIndicatorText) {
-                    this.soundIndicatorText.setText(`AUDIO ACTIVO: Ninguno`);
-                    this.soundIndicatorText.setColor('#94a3b8');
-                }
-            });
+    /**
+     * Limpia la notificación al salir de la zona
+     */
+    clearSoundNotification() {
+        if (this.toastContainer) {
+            this.toastContainer.setVisible(false);
+        }
+        if (this.soundIndicatorText) {
+            this.soundIndicatorText.setText('AUDIO ACTIVO: Ninguno');
+            this.soundIndicatorText.setColor('#94a3b8');
         }
     }
 
@@ -108,8 +118,6 @@ class GameScene extends Phaser.Scene {
      */
     createHUD() {
         const width = this.cameras.main.width;
-
-        // Grupo HUD fijado a la pantalla (scrollFactor = 0)
         const hudDepth = 200;
 
         // 1. Barra de estado superior
@@ -131,12 +139,12 @@ class GameScene extends Phaser.Scene {
             color: '#94a3b8'
         }).setScrollFactor(0).setDepth(hudDepth + 1);
 
-        // Botón: REINICIAR POSICIÓN (Derecha)
+        // Botón: REINICIAR POSICIÓN
         const resetBtnBg = this.add.rectangle(width - 240, 28, 110, 34, 0x334155, 1)
             .setScrollFactor(0).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
         resetBtnBg.setStrokeStyle(1, 0x64748b);
 
-        const resetBtnLabel = this.add.text(width - 240, 28, '🔄 Reiniciar', {
+        this.add.text(width - 240, 28, '🔄 Reiniciar', {
             fontFamily: 'Arial, sans-serif',
             fontSize: '13px',
             color: '#ffffff'
@@ -146,7 +154,7 @@ class GameScene extends Phaser.Scene {
             this.player.sprite.setPosition(640, 420);
         });
 
-        // Botón: SILENCIAR AUDIO (Derecha)
+        // Botón: SILENCIAR AUDIO
         this.isMuted = this.sound.mute;
         const muteBtnBg = this.add.rectangle(width - 110, 28, 120, 34, 0x0284c7, 1)
             .setScrollFactor(0).setDepth(hudDepth + 1).setInteractive({ useHandCursor: true });
@@ -165,7 +173,7 @@ class GameScene extends Phaser.Scene {
             muteBtnBg.setFillStyle(this.isMuted ? 0xef4444 : 0x0284c7);
         });
 
-        // 2. Banner de Notificación Flotante Discreta (Toast)
+        // 2. Banner de Notificación Flotante (Toast)
         this.toastContainer = this.add.container(width / 2, 95).setScrollFactor(0).setDepth(hudDepth + 10).setVisible(false);
 
         const toastBg = this.add.rectangle(0, 0, 440, 46, 0x1e293b, 0.95)
