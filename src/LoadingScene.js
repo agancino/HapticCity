@@ -1,7 +1,7 @@
 /**
  * LoadingScene.js
- * Escena de carga con barra de progreso y generación de recursos sintéticos/procedimentales
- * para garantizar la ejecución inmediata del proyecto Haptic City sin dependencias externas obligatorias.
+ * Escena de carga con generación inmediata de recursos procedimentales
+ * para garantizar la ejecución inmediata del proyecto Haptic City en cualquier entorno o protocolo.
  */
 class LoadingScene extends Phaser.Scene {
     constructor() {
@@ -9,44 +9,12 @@ class LoadingScene extends Phaser.Scene {
     }
 
     preload() {
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
-
-        // Fondo de pantalla de carga
-        this.add.rectangle(width / 2, height / 2, width, height, 0x0d1117);
-
-        // Título de Carga
-        this.add.text(width / 2, height / 2 - 80, 'HAPTIC CITY', {
-            fontFamily: '"Press Start 2P", monospace',
-            fontSize: '28px',
-            color: '#38bdf8'
-        }).setOrigin(0.5);
-
-        this.add.text(width / 2, height / 2 - 40, 'Demostración de Audio y Tecnología Háptica', {
-            fontFamily: 'Outfit, sans-serif',
-            fontSize: '16px',
-            color: '#94a3b8'
-        }).setOrigin(0.5);
-
         // Generar recursos gráficos procedimentales INMEDIATAMENTE en memoria
-        // para asegurar que el juego funcione sin depender de cargas de archivos de red/disco
         this.generateProceduralGraphics();
-
-        // Si la carga falla por archivos inexistentes o protocolo file://, no bloquear el juego
-        this.load.on('loaderror', (fileObj) => {
-            console.warn('Recurso opcional no encontrado:', fileObj.key);
-        });
-
-        // Configuración de temporizador de seguridad de 500ms para avanzar al Menú automáticamente
-        this.time.delayedCall(500, () => {
-            if (this.scene.isActive('LoadingScene')) {
-                this.scene.start('MenuScene');
-            }
-        });
     }
 
     create() {
-        // Transición a la pantalla de menú principal
+        // Transición directa a la pantalla de menú principal
         this.scene.start('MenuScene');
     }
 
