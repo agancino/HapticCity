@@ -22,7 +22,7 @@ class GameScene extends Phaser.Scene {
         this.player = new Player(this, 640, 420);
 
         // Configurar colisión física entre el jugador y las paredes/edificios
-        this.physics.add.collider(this.sprite || this.player.sprite, this.cityMap.colliders);
+        this.physics.add.collider(this.player.sprite, this.cityMap.colliders);
 
         // 4. Gestor de Entradas Teclado (PC) y Joystick Táctil (Móviles)
         this.inputManager = new InputManager(this);
