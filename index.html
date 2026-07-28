@@ -5,19 +5,66 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haptic City - Demostración Háptica</title>
     <meta name="description" content="Demostración académica interactiva de tecnología háptica y audio espacial urbano desarrollada con Phaser 3.">
+    <!-- Diagnóstico visual de errores de navegador -->
+    <script>
+        window.onerror = function(msg, url, line, col, error) {
+            var errDiv = document.getElementById('debug-error-overlay');
+            if (!errDiv) {
+                errDiv = document.createElement('div');
+                errDiv.id = 'debug-error-overlay';
+                errDiv.style.position = 'fixed';
+                errDiv.style.top = '10px';
+                errDiv.style.left = '10px';
+                errDiv.style.right = '10px';
+                errDiv.style.padding = '20px';
+                errDiv.style.background = '#dc2626';
+                errDiv.style.color = '#ffffff';
+                errDiv.style.fontSize = '16px';
+                errDiv.style.fontFamily = 'monospace';
+                errDiv.style.zIndex = '9999999';
+                errDiv.style.borderRadius = '8px';
+                errDiv.style.boxShadow = '0 10px 25px rgba(0,0,0,0.8)';
+                errDiv.style.whiteSpace = 'pre-wrap';
+                document.body.appendChild(errDiv);
+            }
+            var filename = url ? url.split('/').pop() : 'script';
+            errDiv.innerText = '❌ ERROR CAPTURADO EN EL NAVEGADOR:\n' + msg + '\n📁 Archivo: ' + filename + ' (Línea ' + line + ')\n\n' + (error && error.stack ? error.stack : '');
+        };
+    </script>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
     <!-- Main Style -->
     <link rel="stylesheet" href="style.css">
-    <!-- Phaser 3 Local Library (Local para evitar bloqueos por seguridad CORS en file://) -->
+    <!-- Phaser 3 Local Library -->
     <script src="phaser.min.js"></script>
 </head>
 <body>
     <div id="app-wrapper">
-        <!-- Game Container -->
+        <!-- Game Canvas Container -->
         <div id="game-container"></div>
+
+        <!-- HTML UI Overlay for Menu & Controls -->
+        <div id="ui-overlay">
+            <!-- Menu Screen Overlay -->
+            <div id="menu-screen" class="ui-screen">
+                <h1 class="game-title">HAPTIC CITY</h1>
+                <p class="game-subtitle">Demostración de Audio Urbano para Sistema Háptico</p>
+                
+                <div class="info-card">
+                    <p>🎯 <strong>Objetivo:</strong> Recorre la ciudad para activar sonidos de vehículos y sirenas.</p>
+                    <p>📱 Audios captados por la app Android para activar la pulsera háptica.</p>
+                    <p>♿ Diseñado para personas con discapacidad auditiva.</p>
+                </div>
+
+                <div class="menu-buttons">
+                    <button id="btn-start" class="btn btn-primary">▶ INICIAR JUEGO</button>
+                    <button id="btn-restart" class="btn btn-secondary">🔄 REINICIAR DEMO</button>
+                    <button id="btn-mute" class="btn btn-secondary">🔊 AUDIO: ACTIVADO</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Game Scripts -->

@@ -6,7 +6,6 @@
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
-    touch-action: none;
 }
 
 html, body {
@@ -36,7 +35,120 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+}
+
+/* UI Overlay Container */
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+    z-index: 100;
+}
+
+/* Glassmorphism UI Screen Card */
+.ui-screen {
+    background: rgba(15, 23, 42, 0.94);
+    border: 2px solid #38bdf8;
+    border-radius: 16px;
+    padding: 32px 24px;
+    max-width: 540px;
+    width: 90%;
+    text-align: center;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(56, 189, 248, 0.25);
+    pointer-events: auto;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.game-title {
+    font-family: 'Press Start 2P', monospace, sans-serif;
+    font-size: 26px;
+    color: #38bdf8;
+    text-shadow: 3px 3px 0px #0284c7;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+}
+
+.game-subtitle {
+    font-size: 16px;
+    color: #94a3b8;
+    margin-bottom: 24px;
+    font-weight: 400;
+}
+
+.info-card {
+    background: rgba(30, 41, 59, 0.9);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 24px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #e2e8f0;
+    text-align: left;
+}
+
+.info-card p {
+    margin-bottom: 6px;
+}
+.info-card p:last-child {
+    margin-bottom: 0;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+}
+
+.btn {
+    width: 100%;
+    max-width: 300px;
+    padding: 14px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-family: 'Outfit', sans-serif;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(2, 132, 199, 0.6);
+    background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
+}
+
+.btn-secondary {
+    background: #334155;
+    color: #f8fafc;
+    border: 1px solid #475569;
+}
+
+.btn-secondary:hover {
+    background: #475569;
+    transform: translateY(-1px);
 }
 
 /* Canvas styling for pixel crispness */
@@ -45,17 +157,5 @@ canvas {
     image-rendering: -webkit-crisp-edges;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
-    border-radius: 4px;
-}
-
-/* Scrollbar customization */
-::-webkit-scrollbar {
-    width: 8px;
-}
-::-webkit-scrollbar-track {
-    background: #0d1117;
-}
-::-webkit-scrollbar-thumb {
-    background: #30363d;
     border-radius: 4px;
 }
