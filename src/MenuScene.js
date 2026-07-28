@@ -1,7 +1,7 @@
 /**
  * MenuScene.js
  * Pantalla inicial de bienvenida del proyecto Haptic City.
- * Conecta los botones HTML/CSS de la interfaz de usuario con el motor de escenas de Phaser 3.
+ * Conecta los botones HTML/CSS con el motor de escenas Phaser 3.
  */
 class MenuScene extends Phaser.Scene {
     constructor() {
@@ -12,10 +12,10 @@ class MenuScene extends Phaser.Scene {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
-        // Fondo gradiente oscuro
+        // Fondo gradiente oscuro en el canvas
         this.add.rectangle(width / 2, height / 2, width, height, 0x0f172a);
 
-        // Mostrar la interfaz HTML del Menú
+        // Asegurar que la pantalla del menú HTML sea visible
         const menuScreen = document.getElementById('menu-screen');
         if (menuScreen) {
             menuScreen.classList.remove('hidden');
@@ -27,20 +27,30 @@ class MenuScene extends Phaser.Scene {
         const btnMute = document.getElementById('btn-mute');
 
         if (btnStart) {
-            btnStart.onclick = () => {
+            btnStart.onclick = (e) => {
+                if (e) e.preventDefault();
                 if (menuScreen) menuScreen.classList.add('hidden');
+                
+                // Activar o desbloquear el contexto de audio en caso de restricciones de navegador
+                if (this.sound && this.sound.context && this.sound.context.state === 'suspended') {
+                    this.sound.context.resume();
+                }
+
+                // Iniciar la escena del juego
                 this.scene.start('GameScene');
             };
         }
 
         if (btnRestart) {
-            btnRestart.onclick = () => {
+            btnRestart.onclick = (e) => {
+                if (e) e.preventDefault();
                 this.scene.restart();
             };
         }
 
         if (btnMute) {
-            btnMute.onclick = () => {
+            btnMute.onclick = (e) => {
+                if (e) e.preventDefault();
                 this.sound.mute = !this.sound.mute;
                 btnMute.innerText = this.sound.mute ? '🔇 AUDIO: SILENCIADO' : '🔊 AUDIO: ACTIVADO';
             };
