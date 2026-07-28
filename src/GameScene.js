@@ -12,31 +12,34 @@ class GameScene extends Phaser.Scene {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
-        // 1. Instanciar Gestor de Audio
+        // 1. Verificación e inicialización de respaldo de texturas
+        this.ensureTexturesExist();
+
+        // 2. Instanciar Gestor de Audio
         this.audioManager = new AudioManager(this);
 
-        // 2. Construir el Mapa de la Ciudad
+        // 3. Construir el Mapa de la Ciudad
         this.cityMap = new CityMap(this);
 
-        // 3. Crear el Jugador en el centro de la ciudad (Cruce Principal)
+        // 4. Crear el Jugador en el centro de la ciudad (Cruce Principal)
         this.player = new Player(this, 640, 420);
 
         // Configurar colisión física entre el jugador y las paredes/edificios
         this.physics.add.collider(this.player.sprite, this.cityMap.colliders);
 
-        // 4. Gestor de Entradas Teclado (PC) y Joystick Táctil (Móviles)
+        // 5. Gestor de Entradas Teclado (PC) y Joystick Táctil (Móviles)
         this.inputManager = new InputManager(this);
         this.mobileControls = new MobileControls(this, this.inputManager);
 
-        // 5. Configurar Cámara Suave centrada en el personaje
+        // 6. Configurar Cámara Suave centrada en el personaje
         this.cameras.main.setBounds(0, 0, this.cityMap.cols * this.cityMap.tileSize, this.cityMap.rows * this.cityMap.tileSize);
         this.cameras.main.startFollow(this.player.sprite, true, 0.08, 0.08);
         this.cameras.main.setZoom(1.1);
 
-        // 6. Configurar Interfaz HUD Superior
+        // 7. Configurar Interfaz HUD Superior
         this.createHUD();
 
-        // 7. Zona de Notificación de Sonido Activo
+        // 8. Zona de Notificación de Sonido Activo
         this.currentActiveSound = 'Ninguno (Camina por la ciudad)';
         this.toastTimer = null;
     }
@@ -78,20 +81,26 @@ class GameScene extends Phaser.Scene {
      */
     showSoundNotification(zoneData) {
         this.currentActiveSound = zoneData.name;
-        this.soundIndicatorText.setText(`AUDIO ACTIVO: ${zoneData.name}`);
-        this.soundIndicatorText.setColor('#38bdf8');
+        if (this.soundIndicatorText) {
+            this.soundIndicatorText.setText(`AUDIO ACTIVO: ${zoneData.name}`);
+            this.soundIndicatorText.setColor('#38bdf8');
+        }
 
         // Banner discreto flotante Toast
-        this.toastContainer.setVisible(true);
-        this.toastText.setText(`🔔 REPRODUCIENDO: ${zoneData.name}\n(Señal enviada a pulsera háptica)`);
+        if (this.toastContainer && this.toastText) {
+            this.toastContainer.setVisible(true);
+            this.toastText.setText(`🔔 REPRODUCIENDO: ${zoneData.name}\n(Señal enviada a pulsera háptica)`);
 
-        if (this.toastTimer) this.toastTimer.remove();
+            if (this.toastTimer) this.toastTimer.remove();
 
-        this.toastTimer = this.time.delayedCall(3000, () => {
-            this.toastContainer.setVisible(false);
-            this.soundIndicatorText.setText(`AUDIO ACTIVO: Ninguno`);
-            this.soundIndicatorText.setColor('#94a3b8');
-        });
+            this.toastTimer = this.time.delayedCall(3000, () => {
+                this.toastContainer.setVisible(false);
+                if (this.soundIndicatorText) {
+                    this.soundIndicatorText.setText(`AUDIO ACTIVO: Ninguno`);
+                    this.soundIndicatorText.setColor('#94a3b8');
+                }
+            });
+        }
     }
 
     /**
@@ -170,5 +179,13 @@ class GameScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         this.toastContainer.add([toastBg, this.toastText]);
+    }
+
+    ensureTexturesExist() {
+        if (!this.textures.exists('tile_grass')) {
+            const loading = new LoadingScene();
+            loading.textures = this.textures;
+            loading.generateProceduralGraphics();
+        }
     }
 }
