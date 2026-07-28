@@ -28,18 +28,18 @@ window.addEventListener('load', () => {
             default: 'arcade',
             arcade: {
                 gravity: { x: 0, y: 0 },
-                debug: false // Cambiar a true si se desea depurar cajas de colisión
+                debug: false // Cambiar a true para visualizar cajas de colisión
             }
         },
         scene: [
             LoadingScene,
-            MenuScene
-            // GameScene se agregará dinámicamente en las siguientes fases
+            MenuScene,
+            GameScene
         ]
     };
 
     const game = new Phaser.Game(config);
 
-    // Ajustar enfoque al canvas para capturar teclado sin requerir clic previo
+    // Enfocar la ventana para recibir teclado inmediatamente
     window.focus();
 });
