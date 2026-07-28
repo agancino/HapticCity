@@ -1,7 +1,6 @@
 /**
  * LoadingScene.js
- * Escena de carga con generación inmediata de recursos procedimentales
- * para garantizar la ejecución inmediata del proyecto Haptic City en cualquier entorno o protocolo.
+ * Escena de carga inicial. Genera las texturas en create() cuando el renderizador ya está listo.
  */
 class LoadingScene extends Phaser.Scene {
     constructor() {
@@ -9,12 +8,14 @@ class LoadingScene extends Phaser.Scene {
     }
 
     preload() {
-        // Generar recursos gráficos procedimentales INMEDIATAMENTE en memoria
-        this.generateProceduralGraphics();
+        // En Phaser 3 la precarga se deja limpia para evitar errores de renderizador no inicializado
     }
 
     create() {
-        // Transición directa a la pantalla de menú principal
+        // Generar texturas procedimentales en memoria ahora que el canvas/renderer está 100% listo
+        this.generateProceduralGraphics();
+
+        // Transición directa a la escena del menú principal
         this.scene.start('MenuScene');
     }
 
@@ -24,7 +25,7 @@ class LoadingScene extends Phaser.Scene {
     generateProceduralGraphics() {
         const gfx = this.make.graphics({ x: 0, y: 0, add: false });
 
-        // 1. Textura de Respaldo para el Jugador (Pixel Art Character: 32x32)
+        // 1. Textura del Jugador (Pixel Art Character: 32x32)
         gfx.clear();
         // Cuerpo / Camiseta (Azul)
         gfx.fillStyle(0x0284c7, 1);
