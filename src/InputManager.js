@@ -57,3 +57,5 @@ class InputManager {
         return { x, y };
     }
 }
+
+window.InputManager = InputManager;

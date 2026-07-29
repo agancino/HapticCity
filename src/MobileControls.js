@@ -90,3 +90,5 @@ class MobileControls {
         this.inputManager.setJoystickVector(0, 0);
     }
 }
+
+window.MobileControls = MobileControls;

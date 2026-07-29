@@ -5,36 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Haptic City - Demostración Háptica</title>
     <meta name="description" content="Demostración académica interactiva de tecnología háptica y audio espacial urbano desarrollada con Phaser 3.">
-    <!-- Diagnóstico visual de errores de navegador -->
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            // Omitir alertas de seguridad CORS de fuentes locales en file://
-            if (msg === 'Script error.' || line === 0 || !url) return true;
-
-            var errDiv = document.getElementById('debug-error-overlay');
-            if (!errDiv) {
-                errDiv = document.createElement('div');
-                errDiv.id = 'debug-error-overlay';
-                errDiv.style.position = 'fixed';
-                errDiv.style.top = '10px';
-                errDiv.style.left = '10px';
-                errDiv.style.right = '10px';
-                errDiv.style.padding = '20px';
-                errDiv.style.background = '#dc2626';
-                errDiv.style.color = '#ffffff';
-                errDiv.style.fontSize = '16px';
-                errDiv.style.fontFamily = 'monospace';
-                errDiv.style.zIndex = '9999999';
-                errDiv.style.borderRadius = '8px';
-                errDiv.style.boxShadow = '0 10px 25px rgba(0,0,0,0.8)';
-                errDiv.style.whiteSpace = 'pre-wrap';
-                document.body.appendChild(errDiv);
-            }
-            var filename = url ? url.split('/').pop() : 'script';
-            errDiv.innerText = '❌ ERROR CAPTURADO EN EL NAVEGADOR:\n' + msg + '\n📁 Archivo: ' + filename + ' (Línea ' + line + ')\n\n' + (error && error.stack ? error.stack : '');
-        };
-    </script>
-    <!-- Google Fonts (carga diferida para no bloquear en file://) -->
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap">
     <!-- Main Style -->
@@ -69,15 +40,15 @@
         </div>
     </div>
 
-    <!-- Audios del usuario embebidos (funciona con file:// y http://) -->
+    <!-- Audios del usuario embebidos -->
     <script src="assets/sounds/sounds-data.js"></script>
     <!-- Game Scripts -->
+    <script src="src/InputManager.js"></script>
+    <script src="src/MobileControls.js"></script>
     <script src="src/LoadingScene.js"></script>
     <script src="src/MenuScene.js"></script>
     <script src="src/Map.js"></script>
     <script src="src/Player.js"></script>
-    <script src="src/InputManager.js"></script>
-    <script src="src/MobileControls.js"></script>
     <script src="src/AudioManager.js"></script>
     <script src="src/GameScene.js"></script>
     <script src="main.js"></script>
