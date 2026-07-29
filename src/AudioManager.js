@@ -1,8 +1,10 @@
 /**
  * AudioManager.js
  * Gestor centralizado de audio para la reproducción de sonidos urbanos (Hospital, Policía, Bomberos, Bocina).
- * Admite reproducción continua mientras el jugador permanece en la zona, carga de archivos reales .mp3/.wav/.ogg
- * desde assets/sounds/, sintetizador WebAudio sintético como fallback automático y Vibration API.
+ * - Reproduce en bucle (loop) el audio mientras el jugador permanece en la zona.
+ * - Detiene el audio inmediatamente cuando el jugador sale de la zona.
+ * - Usa archivos reales .mp3 de assets/sounds/ si existen, o sintetizador WebAudio como fallback.
+ * - Soporta Vibration API como feedback háptico local en dispositivos móviles.
  */
 class AudioManager {
     constructor(scene) {
@@ -10,13 +12,13 @@ class AudioManager {
         this.volume = 0.8;
         this.currentZoneId = null;
         this.activePhaserSound = null;
-        this.activeSynthInterval = null;
 
-        // Contexto de WebAudio de respaldo para síntesis inmediata
+        // Contexto de WebAudio para sintetizador de respaldo
         this.audioCtx = null;
+        this.activeSynthInterval = null;
         this.initWebAudioFallback();
 
-        // Pausar audio al cambiar de pestaña
+        // Pausar audio al minimizar o cambiar de pestaña
         this.setupTabVisibilityListener();
     }
 
@@ -27,97 +29,112 @@ class AudioManager {
                 this.audioCtx = new AudioContext();
             }
         } catch (e) {
-            console.warn('WebAudio no disponible:', e);
+            console.warn('[AudioManager] WebAudio no disponible:', e);
         }
     }
 
     /**
-     * Activa el sonido continuo de una zona mientras el jugador permanece en ella
-     * @param {Object} zoneData - Datos de la zona { id, name, soundKey }
-     * @param {Function} onSoundTriggeredCallback - Callback para notificar a la UI
+     * Activa la reproducción en bucle del sonido de la zona mientras el jugador permanece en ella.
+     * Si ya se estaba reproduciendo el mismo audio, NO lo reinicia (continuidad sin interrupciones).
+     * @param {Object} zoneData - { id, name, soundKey }
+     * @param {Function} onSoundTriggeredCallback - Callback para actualizar la UI
      */
     triggerZoneSound(zoneData, onSoundTriggeredCallback) {
-        // Si el jugador ya se encuentra en esta misma zona y el audio está sonando, no reiniciar
+        // El jugador YA está en esta zona y el audio YA suena → no hacer nada
         if (this.currentZoneId === zoneData.id) {
             return;
         }
 
-        // Detener cualquier sonido activo de la zona anterior
+        // Detener el audio de la zona anterior si hubiera uno
         this.stopActiveZoneSound();
 
         this.currentZoneId = zoneData.id;
 
-        // Intentar reproducir archivo local .mp3 / .wav / .ogg si fue precargado por el usuario
-        let playedSuccessfully = false;
+        // ----- INTENTAR REPRODUCIR EL ARCHIVO .MP3 REAL DEL USUARIO -----
+        let usedRealAudio = false;
+
         if (this.scene.cache.audio.exists(zoneData.soundKey)) {
             try {
+                // Desbloquear WebAudio Context si el navegador lo tiene suspendido
+                if (this.scene.sound.context && this.scene.sound.context.state === 'suspended') {
+                    this.scene.sound.context.resume();
+                }
+
+                // Crear instancia de sonido con loop activado
                 this.activePhaserSound = this.scene.sound.add(zoneData.soundKey, {
                     volume: this.volume,
-                    loop: true // Mantener el sonido sonando continuamente mientras el usuario está en la zona
+                    loop: true   // ← Bucle infinito mientras el jugador permanezca en la zona
                 });
+
                 this.activePhaserSound.play();
-                playedSuccessfully = true;
+                usedRealAudio = true;
+
+                console.log(`[AudioManager] 🎵 Reproduciendo en bucle: ${zoneData.soundKey}`);
             } catch (e) {
-                console.warn('Error al reproducir audio de Phaser:', e);
+                console.warn('[AudioManager] Error reproduciendo audio Phaser:', e);
             }
         }
 
-        // Si el archivo nativo aún no existe en assets/sounds/, usar sintetizador WebAudio en bucle
-        if (!playedSuccessfully && this.audioCtx) {
+        // ----- SINTETIZADOR DE RESPALDO SI NO HAY ARCHIVO .MP3 -----
+        if (!usedRealAudio) {
+            console.log(`[AudioManager] 🔊 Usando sintetizador para: ${zoneData.id}`);
             this.playSyntheticAudioLoop(zoneData.id);
         }
 
-        // Feedback de vibración háptica opcional en celulares
+        // ----- VIBRACIÓN HÁPTICA OPCIONAL EN CELULARES -----
         if ('vibrate' in navigator && typeof navigator.vibrate === 'function') {
             try {
                 navigator.vibrate([150, 80, 150]);
-            } catch (err) {}
+            } catch (_) {}
         }
 
+        // Notificar a la UI
         if (onSoundTriggeredCallback) {
             onSoundTriggeredCallback(zoneData);
         }
     }
 
     /**
-     * Detiene el sonido actual inmediatamente cuando el jugador sale de la zona
+     * Detiene inmediatamente el audio activo.
+     * Se llama cuando el jugador sale de la zona.
      */
     stopActiveZoneSound() {
         this.currentZoneId = null;
 
-        // Detener sonido de Phaser
+        // Detener y destruir el sonido Phaser
         if (this.activePhaserSound) {
             try {
-                this.activePhaserSound.stop();
+                if (this.activePhaserSound.isPlaying) {
+                    this.activePhaserSound.stop();
+                }
                 this.activePhaserSound.destroy();
-            } catch (e) {}
+            } catch (_) {}
             this.activePhaserSound = null;
         }
 
-        // Detener bucle sintético de WebAudio
+        // Detener el bucle del sintetizador de respaldo
         if (this.activeSynthInterval) {
             clearInterval(this.activeSynthInterval);
             this.activeSynthInterval = null;
         }
     }
 
-    /**
-     * Generador sintético de audio continuo para cuando aún no hay archivos .mp3 subidos
-     */
-    playSyntheticAudioLoop(type) {
-        // Ejecutar inmediatamente el primer pulso
-        this.playSyntheticPulse(type);
+    // ===================================================================
+    //  SINTETIZADOR WEBAUDIO DE RESPALDO
+    //  Se utiliza automáticamente si no hay archivos .mp3 en assets/sounds/
+    // ===================================================================
 
-        // Repetir continuamente mientras el jugador siga en la zona
-        const intervalTime = type === 'intersection' ? 1200 : 2500;
+    playSyntheticAudioLoop(type) {
+        this.playSyntheticPulse(type);
+        const intervalMs = (type === 'intersection') ? 1100 : 2600;
         this.activeSynthInterval = setInterval(() => {
-            if (this.currentZoneId) {
-                this.playSyntheticPulse(type);
-            } else {
+            if (!this.currentZoneId) {
                 clearInterval(this.activeSynthInterval);
                 this.activeSynthInterval = null;
+                return;
             }
-        }, intervalTime);
+            this.playSyntheticPulse(type);
+        }, intervalMs);
     }
 
     playSyntheticPulse(type) {
@@ -126,86 +143,83 @@ class AudioManager {
             this.audioCtx.resume();
         }
 
-        const now = this.audioCtx.currentTime;
-        const masterGain = this.audioCtx.createGain();
-        masterGain.gain.setValueAtTime(this.volume, now);
-        masterGain.connect(this.audioCtx.destination);
+        const t = this.audioCtx.currentTime;
+        const gain = this.audioCtx.createGain();
+        gain.gain.setValueAtTime(this.volume, t);
+        gain.connect(this.audioCtx.destination);
 
         if (type === 'hospital') {
-            // 🚑 Sirena de Ambulancia (Modulación continuo 600Hz <-> 900Hz)
             const osc = this.audioCtx.createOscillator();
             osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, now);
-            osc.frequency.linearRampToValueAtTime(900, now + 0.7);
-            osc.frequency.linearRampToValueAtTime(600, now + 1.4);
-            osc.frequency.linearRampToValueAtTime(900, now + 2.1);
-            masterGain.gain.exponentialRampToValueAtTime(0.01, now + 2.3);
-
-            osc.connect(masterGain);
-            osc.start(now);
-            osc.stop(now + 2.3);
+            osc.frequency.setValueAtTime(600, t);
+            osc.frequency.linearRampToValueAtTime(900, t + 0.7);
+            osc.frequency.linearRampToValueAtTime(600, t + 1.4);
+            osc.frequency.linearRampToValueAtTime(900, t + 2.1);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
+            osc.connect(gain);
+            osc.start(t);
+            osc.stop(t + 2.3);
 
         } else if (type === 'police') {
-            // 🚓 Sirena de Policía (Agudos rápidos)
             const osc = this.audioCtx.createOscillator();
             osc.type = 'sawtooth';
             for (let i = 0; i < 4; i++) {
-                const step = now + i * 0.4;
-                osc.frequency.setValueAtTime(700, step);
-                osc.frequency.linearRampToValueAtTime(1400, step + 0.35);
+                const s = t + i * 0.4;
+                osc.frequency.setValueAtTime(700, s);
+                osc.frequency.linearRampToValueAtTime(1400, s + 0.35);
             }
-            masterGain.gain.exponentialRampToValueAtTime(0.01, now + 1.8);
-
-            osc.connect(masterGain);
-            osc.start(now);
-            osc.stop(now + 1.8);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 1.8);
+            osc.connect(gain);
+            osc.start(t);
+            osc.stop(t + 1.8);
 
         } else if (type === 'fire') {
-            // 🚒 Sirena de Bomberos (Tono grave de advertencia)
             const osc = this.audioCtx.createOscillator();
             osc.type = 'triangle';
-            osc.frequency.setValueAtTime(350, now);
-            osc.frequency.linearRampToValueAtTime(550, now + 1.1);
-            osc.frequency.linearRampToValueAtTime(350, now + 2.2);
-            masterGain.gain.exponentialRampToValueAtTime(0.01, now + 2.3);
-
-            osc.connect(masterGain);
-            osc.start(now);
-            osc.stop(now + 2.3);
+            osc.frequency.setValueAtTime(350, t);
+            osc.frequency.linearRampToValueAtTime(550, t + 1.1);
+            osc.frequency.linearRampToValueAtTime(350, t + 2.2);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
+            osc.connect(gain);
+            osc.start(t);
+            osc.stop(t + 2.3);
 
         } else if (type === 'intersection') {
-            // 🚗 Bocina de Auto
-            const osc1 = this.audioCtx.createOscillator();
-            const osc2 = this.audioCtx.createOscillator();
-            osc1.type = 'square';
-            osc2.type = 'square';
-            osc1.frequency.setValueAtTime(400, now);
-            osc2.frequency.setValueAtTime(500, now);
-
-            masterGain.gain.setValueAtTime(this.volume * 0.35, now);
-            masterGain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-
-            osc1.connect(masterGain);
-            osc2.connect(masterGain);
-            osc1.start(now);
-            osc2.start(now);
-            osc1.stop(now + 0.6);
-            osc2.stop(now + 0.6);
+            const o1 = this.audioCtx.createOscillator();
+            const o2 = this.audioCtx.createOscillator();
+            o1.type = 'square'; o2.type = 'square';
+            o1.frequency.setValueAtTime(400, t);
+            o2.frequency.setValueAtTime(500, t);
+            gain.gain.setValueAtTime(this.volume * 0.35, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+            o1.connect(gain); o2.connect(gain);
+            o1.start(t); o2.start(t);
+            o1.stop(t + 0.6); o2.stop(t + 0.6);
         }
     }
 
     setVolume(value) {
         this.volume = Phaser.Math.Clamp(value, 0, 1);
         this.scene.sound.volume = this.volume;
+        if (this.activePhaserSound) {
+            this.activePhaserSound.setVolume(this.volume);
+        }
     }
 
     setupTabVisibilityListener() {
         document.addEventListener('visibilitychange', () => {
             if (document.hidden) {
-                this.stopActiveZoneSound();
-                this.scene.sound.pauseAll();
+                if (this.activePhaserSound && this.activePhaserSound.isPlaying) {
+                    this.activePhaserSound.pause();
+                }
+                if (this.activeSynthInterval) {
+                    clearInterval(this.activeSynthInterval);
+                    this.activeSynthInterval = null;
+                }
             } else {
-                this.scene.sound.resumeAll();
+                if (this.activePhaserSound && this.currentZoneId) {
+                    this.activePhaserSound.resume();
+                }
             }
         });
     }
