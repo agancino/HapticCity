@@ -115,7 +115,7 @@ html, body {
     align-items: center;
 }
 
-.btn {
+.btn, button {
     width: 100%;
     max-width: 300px;
     padding: 14px 20px;
@@ -126,6 +126,9 @@ html, body {
     cursor: pointer;
     transition: all 0.2s ease;
     font-family: 'Outfit', sans-serif;
+    touch-action: manipulation !important; /* Permitir toques táctiles móviles */
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto !important;
 }
 
 .btn-primary {
@@ -134,7 +137,7 @@ html, body {
     box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
 }
 
-.btn-primary:hover {
+.btn-primary:hover, .btn-primary:active {
     transform: translateY(-2px);
     box-shadow: 0 6px 18px rgba(2, 132, 199, 0.6);
     background: linear-gradient(135deg, #38bdf8 0%, #0284c7 100%);
@@ -146,7 +149,7 @@ html, body {
     border: 1px solid #475569;
 }
 
-.btn-secondary:hover {
+.btn-secondary:hover, .btn-secondary:active {
     background: #475569;
     transform: translateY(-1px);
 }
@@ -158,4 +161,5 @@ canvas {
     image-rendering: pixelated;
     image-rendering: crisp-edges;
     border-radius: 4px;
+    touch-action: none;
 }

@@ -32,7 +32,7 @@
                 </div>
 
                 <div class="menu-buttons">
-                    <button id="btn-start" class="btn btn-primary" onclick="if(window.hapticCityGameInstance){ document.getElementById('menu-screen').classList.add('hidden'); window.hapticCityGameInstance.scene.start('GameScene'); }">▶ INICIAR JUEGO</button>
+                    <button id="btn-start" class="btn btn-primary">▶ INICIAR JUEGO</button>
                     <button id="btn-restart" class="btn btn-secondary">🔄 REINICIAR DEMO</button>
                     <button id="btn-mute" class="btn btn-secondary">🔊 AUDIO: ACTIVADO</button>
                 </div>
@@ -52,5 +52,32 @@
     <script src="src/AudioManager.js"></script>
     <script src="src/GameScene.js"></script>
     <script src="main.js"></script>
+
+    <!-- Escuchador táctil universal para móviles y tablets -->
+    <script>
+        function launchGameFromMobile() {
+            var menuScreen = document.getElementById('menu-screen');
+            if (menuScreen) menuScreen.classList.add('hidden');
+            if (window.hapticCityGameInstance) {
+                try {
+                    if (window.hapticCityGameInstance.sound && window.hapticCityGameInstance.sound.context) {
+                        window.hapticCityGameInstance.sound.context.resume();
+                    }
+                } catch(e) {}
+                window.hapticCityGameInstance.scene.start('GameScene');
+            }
+        }
+
+        var btnStart = document.getElementById('btn-start');
+        if (btnStart) {
+            btnStart.addEventListener('touchstart', function(e) {
+                e.preventDefault();
+                launchGameFromMobile();
+            }, { passive: false });
+            btnStart.addEventListener('click', function(e) {
+                launchGameFromMobile();
+            });
+        }
+    </script>
 </body>
 </html>
