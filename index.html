@@ -34,10 +34,9 @@
             errDiv.innerText = '❌ ERROR CAPTURADO EN EL NAVEGADOR:\n' + msg + '\n📁 Archivo: ' + filename + ' (Línea ' + line + ')\n\n' + (error && error.stack ? error.stack : '');
         };
     </script>
-    <!-- Google Fonts -->
+    <!-- Google Fonts (carga diferida para no bloquear en file://) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap">
     <!-- Main Style -->
     <link rel="stylesheet" href="style.css">
     <!-- Phaser 3 Local Library -->
@@ -70,6 +69,8 @@
         </div>
     </div>
 
+    <!-- Audios del usuario embebidos (funciona con file:// y http://) -->
+    <script src="assets/sounds/sounds-data.js"></script>
     <!-- Game Scripts -->
     <script src="src/LoadingScene.js"></script>
     <script src="src/MenuScene.js"></script>

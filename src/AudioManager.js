@@ -1,188 +1,196 @@
 /**
  * AudioManager.js
- * Gestor centralizado de audio para la reproducción de sonidos urbanos (Hospital, Policía, Bomberos, Bocina).
- * - Reproduce en bucle (loop) el audio mientras el jugador permanece en la zona.
- * - Detiene el audio inmediatamente cuando el jugador sale de la zona.
- * - Usa archivos reales .mp3 de assets/sounds/ si existen, o sintetizador WebAudio como fallback.
- * - Soporta Vibration API como feedback háptico local en dispositivos móviles.
+ * Gestor centralizado de audio para la reproducción de sonidos urbanos.
+ * Usa los archivos .mp3 del usuario embebidos en base64 (sounds-data.js) para funcionar con file://.
+ * Reproduce en bucle mientras el jugador permanece en la zona y detiene al salir.
  */
 class AudioManager {
     constructor(scene) {
         this.scene = scene;
         this.volume = 0.8;
         this.currentZoneId = null;
-        this.activePhaserSound = null;
+        this.activeAudioNode = null;
 
-        // Contexto de WebAudio para sintetizador de respaldo
-        this.audioCtx = null;
-        this.activeSynthInterval = null;
-        this.initWebAudioFallback();
-
-        // Pausar audio al minimizar o cambiar de pestaña
-        this.setupTabVisibilityListener();
-    }
-
-    initWebAudioFallback() {
+        // WebAudio API nativa para decodificar y reproducir los base64 sin restricciones
         try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            if (AudioContext) {
-                this.audioCtx = new AudioContext();
-            }
+            const AC = window.AudioContext || window.webkitAudioContext;
+            this.audioCtx = AC ? new AC() : null;
         } catch (e) {
-            console.warn('[AudioManager] WebAudio no disponible:', e);
+            this.audioCtx = null;
         }
+
+        // Cache de AudioBuffers decodificados (para no decodificar dos veces)
+        this.bufferCache = {};
+
+        // Mapa de zoneId → clave en HAPTIC_SOUNDS
+        this.soundMap = {
+            'hospital':     'ambulance',
+            'police':       'police',
+            'fire':         'fire',
+            'intersection': 'horn'
+        };
+
+        // Pausar audio al cambiar de pestaña
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.stopActiveZoneSound();
+            }
+        });
     }
 
     /**
-     * Activa la reproducción en bucle del sonido de la zona mientras el jugador permanece en ella.
-     * Si ya se estaba reproduciendo el mismo audio, NO lo reinicia (continuidad sin interrupciones).
-     * @param {Object} zoneData - { id, name, soundKey }
-     * @param {Function} onSoundTriggeredCallback - Callback para actualizar la UI
+     * Activa la reproducción en BUCLE del audio de la zona.
+     * No reinicia si el jugador ya está en la misma zona (continuidad sin cortes).
      */
     triggerZoneSound(zoneData, onSoundTriggeredCallback) {
-        // El jugador YA está en esta zona y el audio YA suena → no hacer nada
-        if (this.currentZoneId === zoneData.id) {
-            return;
-        }
+        if (this.currentZoneId === zoneData.id) return;
 
-        // Detener el audio de la zona anterior si hubiera uno
         this.stopActiveZoneSound();
-
         this.currentZoneId = zoneData.id;
 
-        // ----- INTENTAR REPRODUCIR EL ARCHIVO .MP3 REAL DEL USUARIO -----
-        let usedRealAudio = false;
-
-        if (this.scene.cache.audio.exists(zoneData.soundKey)) {
-            try {
-                // Desbloquear WebAudio Context si el navegador lo tiene suspendido
-                if (this.scene.sound.context && this.scene.sound.context.state === 'suspended') {
-                    this.scene.sound.context.resume();
-                }
-
-                // Crear instancia de sonido con loop activado
-                this.activePhaserSound = this.scene.sound.add(zoneData.soundKey, {
-                    volume: this.volume,
-                    loop: true   // ← Bucle infinito mientras el jugador permanezca en la zona
-                });
-
-                this.activePhaserSound.play();
-                usedRealAudio = true;
-
-                console.log(`[AudioManager] 🎵 Reproduciendo en bucle: ${zoneData.soundKey}`);
-            } catch (e) {
-                console.warn('[AudioManager] Error reproduciendo audio Phaser:', e);
-            }
-        }
-
-        // ----- SINTETIZADOR DE RESPALDO SI NO HAY ARCHIVO .MP3 -----
-        if (!usedRealAudio) {
-            console.log(`[AudioManager] 🔊 Usando sintetizador para: ${zoneData.id}`);
-            this.playSyntheticAudioLoop(zoneData.id);
-        }
-
-        // ----- VIBRACIÓN HÁPTICA OPCIONAL EN CELULARES -----
-        if ('vibrate' in navigator && typeof navigator.vibrate === 'function') {
-            try {
-                navigator.vibrate([150, 80, 150]);
-            } catch (_) {}
-        }
-
-        // Notificar a la UI
         if (onSoundTriggeredCallback) {
             onSoundTriggeredCallback(zoneData);
         }
+
+        // Vibración háptica opcional en móviles
+        if ('vibrate' in navigator) {
+            try { navigator.vibrate([150, 80, 150]); } catch (_) {}
+        }
+
+        // Buscar la clave de audio en el objeto HAPTIC_SOUNDS (embebido en base64)
+        const soundKey = this.soundMap[zoneData.id];
+
+        if (typeof HAPTIC_SOUNDS !== 'undefined' && HAPTIC_SOUNDS[soundKey]) {
+            this.playBase64Loop(zoneData.id, HAPTIC_SOUNDS[soundKey]);
+        } else {
+            // Fallback al sintetizador si no hay base64
+            this.playSynthLoop(zoneData.id);
+        }
     }
 
     /**
-     * Detiene inmediatamente el audio activo.
-     * Se llama cuando el jugador sale de la zona.
+     * Decodifica el Data URL base64 y lo reproduce en bucle usando WebAudio.
+     */
+    async playBase64Loop(zoneId, dataUrl) {
+        if (!this.audioCtx) {
+            this.playSynthLoop(zoneId);
+            return;
+        }
+
+        try {
+            if (this.audioCtx.state === 'suspended') {
+                await this.audioCtx.resume();
+            }
+
+            // Usar el buffer cacheado si ya fue decodificado antes
+            let buffer = this.bufferCache[zoneId];
+
+            if (!buffer) {
+                // Convertir data URL a ArrayBuffer
+                const base64 = dataUrl.split(',')[1];
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                buffer = await this.audioCtx.decodeAudioData(bytes.buffer);
+                this.bufferCache[zoneId] = buffer;
+            }
+
+            // Si mientras decodificaba el jugador salió, no reproducir
+            if (this.currentZoneId !== zoneId) return;
+
+            // Crear nodo de fuente con loop activado
+            const source = this.audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.loop = true;
+
+            const gainNode = this.audioCtx.createGain();
+            gainNode.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
+
+            source.connect(gainNode);
+            gainNode.connect(this.audioCtx.destination);
+            source.start(0);
+
+            // Guardar referencias para detener cuando el jugador salga
+            this.activeAudioNode = { source, gainNode };
+
+        } catch (e) {
+            console.warn('[AudioManager] Error decodificando audio base64, usando sintetizador:', e);
+            this.playSynthLoop(zoneId);
+        }
+    }
+
+    /**
+     * Detiene inmediatamente el audio activo cuando el jugador sale de la zona.
      */
     stopActiveZoneSound() {
         this.currentZoneId = null;
 
-        // Detener y destruir el sonido Phaser
-        if (this.activePhaserSound) {
+        if (this.activeAudioNode) {
             try {
-                if (this.activePhaserSound.isPlaying) {
-                    this.activePhaserSound.stop();
-                }
-                this.activePhaserSound.destroy();
+                const { source, gainNode } = this.activeAudioNode;
+                const t = this.audioCtx.currentTime;
+                gainNode.gain.setTargetAtTime(0, t, 0.1);  // Fade-out suave
+                source.stop(t + 0.2);
             } catch (_) {}
-            this.activePhaserSound = null;
+            this.activeAudioNode = null;
         }
 
-        // Detener el bucle del sintetizador de respaldo
-        if (this.activeSynthInterval) {
-            clearInterval(this.activeSynthInterval);
-            this.activeSynthInterval = null;
+        if (this.synthInterval) {
+            clearInterval(this.synthInterval);
+            this.synthInterval = null;
         }
     }
 
-    // ===================================================================
-    //  SINTETIZADOR WEBAUDIO DE RESPALDO
-    //  Se utiliza automáticamente si no hay archivos .mp3 en assets/sounds/
-    // ===================================================================
+    // ─── SINTETIZADOR DE RESPALDO ─────────────────────────────────────────────
 
-    playSyntheticAudioLoop(type) {
-        this.playSyntheticPulse(type);
-        const intervalMs = (type === 'intersection') ? 1100 : 2600;
-        this.activeSynthInterval = setInterval(() => {
-            if (!this.currentZoneId) {
-                clearInterval(this.activeSynthInterval);
-                this.activeSynthInterval = null;
-                return;
-            }
-            this.playSyntheticPulse(type);
-        }, intervalMs);
+    playSynthLoop(type) {
+        this.playSynthPulse(type);
+        const ms = type === 'intersection' ? 1100 : 2600;
+        this.synthInterval = setInterval(() => {
+            if (!this.currentZoneId) { clearInterval(this.synthInterval); return; }
+            this.playSynthPulse(type);
+        }, ms);
     }
 
-    playSyntheticPulse(type) {
-        if (!this.audioCtx) return;
-        if (this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
-        }
+    playSynthPulse(type) {
+        if (!this.audioCtx || this.audioCtx.state === 'closed') return;
+        if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
 
         const t = this.audioCtx.currentTime;
-        const gain = this.audioCtx.createGain();
-        gain.gain.setValueAtTime(this.volume, t);
-        gain.connect(this.audioCtx.destination);
+        const g = this.audioCtx.createGain();
+        g.gain.setValueAtTime(this.volume, t);
+        g.connect(this.audioCtx.destination);
 
         if (type === 'hospital') {
-            const osc = this.audioCtx.createOscillator();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(600, t);
-            osc.frequency.linearRampToValueAtTime(900, t + 0.7);
-            osc.frequency.linearRampToValueAtTime(600, t + 1.4);
-            osc.frequency.linearRampToValueAtTime(900, t + 2.1);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
-            osc.connect(gain);
-            osc.start(t);
-            osc.stop(t + 2.3);
+            const o = this.audioCtx.createOscillator();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(600, t);
+            o.frequency.linearRampToValueAtTime(900, t + 0.7);
+            o.frequency.linearRampToValueAtTime(600, t + 1.4);
+            o.frequency.linearRampToValueAtTime(900, t + 2.1);
+            g.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
+            o.connect(g); o.start(t); o.stop(t + 2.3);
 
         } else if (type === 'police') {
-            const osc = this.audioCtx.createOscillator();
-            osc.type = 'sawtooth';
+            const o = this.audioCtx.createOscillator();
+            o.type = 'sawtooth';
             for (let i = 0; i < 4; i++) {
-                const s = t + i * 0.4;
-                osc.frequency.setValueAtTime(700, s);
-                osc.frequency.linearRampToValueAtTime(1400, s + 0.35);
+                o.frequency.setValueAtTime(700, t + i * 0.4);
+                o.frequency.linearRampToValueAtTime(1400, t + i * 0.4 + 0.35);
             }
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 1.8);
-            osc.connect(gain);
-            osc.start(t);
-            osc.stop(t + 1.8);
+            g.gain.exponentialRampToValueAtTime(0.01, t + 1.8);
+            o.connect(g); o.start(t); o.stop(t + 1.8);
 
         } else if (type === 'fire') {
-            const osc = this.audioCtx.createOscillator();
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(350, t);
-            osc.frequency.linearRampToValueAtTime(550, t + 1.1);
-            osc.frequency.linearRampToValueAtTime(350, t + 2.2);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
-            osc.connect(gain);
-            osc.start(t);
-            osc.stop(t + 2.3);
+            const o = this.audioCtx.createOscillator();
+            o.type = 'triangle';
+            o.frequency.setValueAtTime(350, t);
+            o.frequency.linearRampToValueAtTime(550, t + 1.1);
+            o.frequency.linearRampToValueAtTime(350, t + 2.2);
+            g.gain.exponentialRampToValueAtTime(0.01, t + 2.3);
+            o.connect(g); o.start(t); o.stop(t + 2.3);
 
         } else if (type === 'intersection') {
             const o1 = this.audioCtx.createOscillator();
@@ -190,37 +198,18 @@ class AudioManager {
             o1.type = 'square'; o2.type = 'square';
             o1.frequency.setValueAtTime(400, t);
             o2.frequency.setValueAtTime(500, t);
-            gain.gain.setValueAtTime(this.volume * 0.35, t);
-            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
-            o1.connect(gain); o2.connect(gain);
+            g.gain.setValueAtTime(this.volume * 0.35, t);
+            g.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+            o1.connect(g); o2.connect(g);
             o1.start(t); o2.start(t);
             o1.stop(t + 0.6); o2.stop(t + 0.6);
         }
     }
 
     setVolume(value) {
-        this.volume = Phaser.Math.Clamp(value, 0, 1);
-        this.scene.sound.volume = this.volume;
-        if (this.activePhaserSound) {
-            this.activePhaserSound.setVolume(this.volume);
+        this.volume = Math.max(0, Math.min(1, value));
+        if (this.activeAudioNode) {
+            this.activeAudioNode.gainNode.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
         }
-    }
-
-    setupTabVisibilityListener() {
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                if (this.activePhaserSound && this.activePhaserSound.isPlaying) {
-                    this.activePhaserSound.pause();
-                }
-                if (this.activeSynthInterval) {
-                    clearInterval(this.activeSynthInterval);
-                    this.activeSynthInterval = null;
-                }
-            } else {
-                if (this.activePhaserSound && this.currentZoneId) {
-                    this.activePhaserSound.resume();
-                }
-            }
-        });
     }
 }
