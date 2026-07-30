@@ -1,7 +1,8 @@
 /**
- * GameScene.js
- * Escena principal del juego Haptic City.
- * Integra la ciudad, el personaje, las zonas de disparo de audio continuo, controles y el HUD.
+ * GameScene.js — Haptic City v2
+ * Sistema de encuentros aleatorios: mientras el personaje pedalea por la ciudad,
+ * un sonido aparece aleatoriamente, el personaje se congela, escucha el sonido
+ * durante 10 segundos, y luego aparece un quiz de 4 opciones para adivinar qué fue.
  */
 class GameScene extends Phaser.Scene {
     constructor() {
@@ -9,236 +10,399 @@ class GameScene extends Phaser.Scene {
     }
 
     preload() {
-        // =====================================================================
-        // CARGAR ARCHIVOS DE AUDIO REALES DEL USUARIO
-        // Coloca tus archivos en la carpeta assets/sounds/ con estos nombres:
-        //   - ambulance.mp3  (o .wav o .ogg) → Zona Hospital
-        //   - police.mp3     (o .wav o .ogg) → Zona Policía
-        //   - fire.mp3       (o .wav o .ogg) → Zona Bomberos
-        //   - horn.mp3       (o .wav o .ogg) → Cruce Principal
-        // =====================================================================
-        this.load.on('loaderror', () => {}); // Ignorar errores si aún no hay archivos
-
-        this.load.audio('sound_ambulance', [
-            'assets/sounds/ambulance.mp3',
-            'assets/sounds/ambulance.ogg',
-            'assets/sounds/ambulance.wav'
-        ]);
-        this.load.audio('sound_police', [
-            'assets/sounds/police.mp3',
-            'assets/sounds/police.ogg',
-            'assets/sounds/police.wav'
-        ]);
-        this.load.audio('sound_fire', [
-            'assets/sounds/fire.mp3',
-            'assets/sounds/fire.ogg',
-            'assets/sounds/fire.wav'
-        ]);
-        this.load.audio('sound_horn', [
-            'assets/sounds/horn.mp3',
-            'assets/sounds/horn.ogg',
-            'assets/sounds/horn.wav'
-        ]);
+        this.load.on('loaderror', () => {});
+        this.load.audio('sound_ambulance', ['assets/sounds/ambulance.mp3', 'assets/sounds/ambulance.ogg', 'assets/sounds/ambulance.wav']);
+        this.load.audio('sound_police', ['assets/sounds/police.mp3', 'assets/sounds/police.ogg', 'assets/sounds/police.wav']);
+        this.load.audio('sound_fire', ['assets/sounds/fire.mp3', 'assets/sounds/fire.ogg', 'assets/sounds/fire.wav']);
+        this.load.audio('sound_horn', ['assets/sounds/horn.mp3', 'assets/sounds/horn.ogg', 'assets/sounds/horn.wav']);
     }
 
     create() {
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
 
-        // 1. Verificación e inicialización de respaldo de texturas
         this.ensureTexturesExist();
 
-        // 2. Instanciar Gestor de Audio
+        // Audio Manager
         this.audioManager = new AudioManager(this);
 
-        // 3. Construir el Mapa de la Ciudad
+        // Mapa de la Ciudad (sin zonas visibles)
         this.cityMap = new CityMap(this);
 
-        // 4. Crear el Jugador en el centro del mapa
+        // Jugador (persona en bicicleta)
         this.player = new Player(this, 640, 400);
-
-        // Configurar colisión física
         this.physics.add.collider(this.player.sprite, this.cityMap.colliders);
 
-        // 5. Gestor de Entradas Teclado (PC) y Joystick Táctil (Móviles)
+        // Controles
         this.inputManager = new InputManager(this);
         this.mobileControls = new MobileControls(this, this.inputManager);
 
-        // 6. Cámara suave centrada en el personaje
+        // Cámara
         this.cameras.main.setBounds(0, 0, this.cityMap.cols * this.cityMap.tileSize, this.cityMap.rows * this.cityMap.tileSize);
         this.cameras.main.startFollow(this.player.sprite, true, 0.08, 0.08);
         this.cameras.main.setZoom(1.0);
 
-        // 7. HUD
+        // ══════ ESTADO DEL SISTEMA DE ENCUENTROS ALEATORIOS ══════
+        this.isPlayerFrozen = false;
+        this.quizActive = false;
+        this.currentQuizSound = null;
+        this.score = 0;
+        this.totalAttempts = 0;
+        this.playerIsMoving = false;
+        this.movingTime = 0;   // Tiempo acumulado que el jugador lleva caminando (ms)
+        this.nextEncounterTime = this.getRandomEncounterDelay(); // Siguiente encuentro (ms)
+
+        // HUD
         this.createHUD();
 
-        // 8. Estado del sonido
-        this.currentActiveZoneId = null;
+        // Quiz UI (oculto al inicio)
+        this.createQuizUI();
+
+        // Overlay de "Escucha atentamente"
+        this.createListeningOverlay();
     }
 
-    update() {
+    update(time, delta) {
         if (!this.player) return;
+
+        if (this.isPlayerFrozen) {
+            // Personaje congelado — no responder a input
+            this.player.sprite.setVelocity(0, 0);
+            return;
+        }
 
         // Leer entradas y mover al personaje
         const inputVector = this.inputManager.getInputVector();
         this.player.move(inputVector);
 
-        // Comprobar si el jugador está dentro o fuera de las zonas de audio
-        this.checkTriggerZones();
+        // Detectar si el jugador se está moviendo
+        const isMovingNow = (Math.abs(inputVector.x) > 0.1 || Math.abs(inputVector.y) > 0.1);
+
+        if (isMovingNow) {
+            this.movingTime += delta;
+
+            // Verificar si es hora de un encuentro aleatorio
+            if (this.movingTime >= this.nextEncounterTime) {
+                this.triggerRandomEncounter();
+            }
+        }
     }
 
     /**
-     * Revisa la posición del jugador respecto a las 4 zonas urbanas.
-     * Mantiene el audio activo continuamente mientras permanezca dentro y lo detiene al salir.
+     * Genera un tiempo aleatorio entre 8 y 20 segundos (en milisegundos)
      */
-    checkTriggerZones() {
-        const playerPos = this.player.getPosition();
-        let insideZone = null;
-
-        for (const zone of this.cityMap.triggerZones) {
-            const left = zone.x - zone.width / 2;
-            const right = zone.x + zone.width / 2;
-            const top = zone.y - zone.height / 2;
-            const bottom = zone.y + zone.height / 2;
-
-            if (playerPos.x >= left && playerPos.x <= right && playerPos.y >= top && playerPos.y <= bottom) {
-                insideZone = zone;
-                break;
-            }
-        }
-
-        if (insideZone) {
-            // Activar audio de esta zona (AudioManager evita reiniciar si ya está sonando)
-            this.audioManager.triggerZoneSound(insideZone, (triggeredZone) => {
-                this.showSoundNotification(triggeredZone);
-            });
-        } else {
-            // El jugador salió de todas las zonas → detener audio y limpiar HUD
-            if (this.audioManager.currentZoneId) {
-                this.audioManager.stopActiveZoneSound();
-                this.clearSoundNotification();
-            }
-        }
+    getRandomEncounterDelay() {
+        return Phaser.Math.Between(8000, 20000);
     }
 
-    showSoundNotification(zoneData) {
+    /**
+     * PASO 1: Congelar al personaje y reproducir un sonido aleatorio
+     */
+    triggerRandomEncounter() {
+        if (this.isPlayerFrozen || this.quizActive) return;
+
+        this.isPlayerFrozen = true;
+        this.movingTime = 0;
+        this.player.sprite.setVelocity(0, 0);
+
+        // Reproducir sonido aleatorio y guardar la respuesta correcta
+        this.currentQuizSound = this.audioManager.playRandomSound();
+
+        // Mostrar overlay de escucha
+        this.showListeningOverlay();
+
+        // Actualizar HUD
         if (this.soundIndicatorText) {
-            this.soundIndicatorText.setText(`AUDIO: ${zoneData.name}`);
+            this.soundIndicatorText.setText('🔔 ¡ESCUCHA ATENTAMENTE!');
+            this.soundIndicatorText.setColor('#facc15');
+        }
+
+        // PASO 2: Después de 10 segundos, detener sonido y mostrar quiz
+        this.time.delayedCall(10000, () => {
+            this.audioManager.stopActiveSound();
+            this.hideListeningOverlay();
+            this.showQuiz();
+        });
+    }
+
+    /**
+     * PASO 2: Mostrar el quiz con las 4 opciones
+     */
+    showQuiz() {
+        this.quizActive = true;
+        this.quizContainer.setVisible(true);
+
+        if (this.soundIndicatorText) {
+            this.soundIndicatorText.setText('❓ ¿QUÉ SONIDO FUE?');
             this.soundIndicatorText.setColor('#38bdf8');
         }
-        if (this.toastContainer && this.toastText) {
-            this.toastContainer.setVisible(true);
-            this.toastText.setText(`🔔 ${zoneData.name}  |  Señal enviada a pulsera háptica`);
-        }
-    }
-
-    clearSoundNotification() {
-        if (this.toastContainer) {
-            this.toastContainer.setVisible(false);
-        }
-        if (this.soundIndicatorText) {
-            this.soundIndicatorText.setText('AUDIO: Ninguno — Camina hacia un edificio');
-            this.soundIndicatorText.setColor('#64748b');
-        }
     }
 
     /**
-     * Crea el HUD fijo en la parte superior de la pantalla
-     * Los botones se colocan en la franja superior y son siempre visibles
+     * PASO 3: Procesar la respuesta del jugador
      */
+    handleQuizAnswer(chosenId) {
+        if (!this.quizActive || !this.currentQuizSound) return;
+
+        this.quizActive = false;
+        this.totalAttempts++;
+        const isCorrect = (chosenId === this.currentQuizSound.id);
+
+        if (isCorrect) {
+            this.score++;
+            this.showFeedback(true, this.currentQuizSound.label);
+        } else {
+            this.showFeedback(false, this.currentQuizSound.label);
+        }
+
+        // Actualizar marcador
+        if (this.scoreText) {
+            this.scoreText.setText(`✅ ${this.score} / ${this.totalAttempts}`);
+        }
+
+        // Ocultar quiz
+        this.quizContainer.setVisible(false);
+
+        // PASO 4: Descongelar después de 2.5 segundos
+        this.time.delayedCall(2500, () => {
+            this.hideFeedback();
+            this.isPlayerFrozen = false;
+            this.nextEncounterTime = this.getRandomEncounterDelay();
+            this.movingTime = 0;
+
+            if (this.soundIndicatorText) {
+                this.soundIndicatorText.setText('🚲 Sigue pedaleando...');
+                this.soundIndicatorText.setColor('#22c55e');
+            }
+        });
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  INTERFAZ DE USUARIO (HUD + Quiz + Feedback + Listening)
+    // ══════════════════════════════════════════════════════════════
+
     createHUD() {
         const width = this.cameras.main.width;
         const hudDepth = 200;
         const BAR_H = 52;
         const BAR_Y = BAR_H / 2;
 
-        // Fondo de la barra HUD
         this.add.rectangle(width / 2, BAR_Y, width, BAR_H, 0x0a0f1e, 0.93)
-            .setScrollFactor(0).setDepth(hudDepth)
-            .setStrokeStyle(1, 0x1e3a5f);
+            .setScrollFactor(0).setDepth(hudDepth).setStrokeStyle(1, 0x1e3a5f);
 
-        // Título
-        this.add.text(14, BAR_Y - 8, 'HAPTIC CITY', {
+        this.add.text(14, BAR_Y, 'HAPTIC CITY', {
             fontFamily: 'monospace',
             fontSize: '13px',
             fontStyle: 'bold',
             color: '#38bdf8'
         }).setScrollFactor(0).setDepth(hudDepth + 1).setOrigin(0, 0.5);
 
-        // Indicador de sonido activo (centro-izquierda)
-        this.soundIndicatorText = this.add.text(180, BAR_Y, 'AUDIO: Ninguno — Camina hacia un edificio', {
+        this.soundIndicatorText = this.add.text(180, BAR_Y, '🚲 Sigue pedaleando...', {
             fontFamily: 'Arial, sans-serif',
             fontSize: '13px',
-            color: '#64748b'
+            color: '#22c55e'
         }).setScrollFactor(0).setDepth(hudDepth + 1).setOrigin(0, 0.5);
 
-        // ── BOTÓN REINICIAR ──
-        const BTN_W = 108;
-        const BTN_H = 34;
-        const resetX = width - 240;
-
-        const resetBg = this.add.rectangle(resetX, BAR_Y, BTN_W, BTN_H, 0x334155)
-            .setScrollFactor(0).setDepth(hudDepth + 1)
-            .setStrokeStyle(1, 0x64748b)
-            .setInteractive({ useHandCursor: true });
-
-        this.add.text(resetX, BAR_Y, '↩ Reiniciar', {
+        // Marcador de puntuación
+        this.scoreText = this.add.text(width - 120, BAR_Y, '✅ 0 / 0', {
             fontFamily: 'Arial, sans-serif',
-            fontSize: '13px',
-            color: '#f1f5f9'
-        }).setScrollFactor(0).setDepth(hudDepth + 2).setOrigin(0.5, 0.5);
+            fontSize: '15px',
+            fontStyle: 'bold',
+            color: '#38bdf8'
+        }).setScrollFactor(0).setDepth(hudDepth + 1).setOrigin(0.5, 0.5);
 
-        resetBg.on('pointerover', () => resetBg.setFillStyle(0x475569));
-        resetBg.on('pointerout', () => resetBg.setFillStyle(0x334155));
-        resetBg.on('pointerdown', () => {
-            this.audioManager.stopActiveZoneSound();
-            this.clearSoundNotification();
-            this.player.sprite.setPosition(640, 400);
-            this.cameras.main.pan(640, 400, 300, 'Power2');
-        });
-
-        // ── BOTÓN SILENCIAR ──
+        // Botón silenciar
         this.isMuted = false;
-        const muteX = width - 110;
-
-        const muteBg = this.add.rectangle(muteX, BAR_Y, BTN_W, BTN_H, 0x0369a1)
-            .setScrollFactor(0).setDepth(hudDepth + 1)
-            .setStrokeStyle(1, 0x38bdf8)
+        const muteBg = this.add.rectangle(width - 40, BAR_Y, 60, 34, 0x0369a1)
+            .setScrollFactor(0).setDepth(hudDepth + 1).setStrokeStyle(1, 0x38bdf8)
             .setInteractive({ useHandCursor: true });
 
-        this.muteBtnLabel = this.add.text(muteX, BAR_Y, '🔊 Sonido ON', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '13px',
-            color: '#f0f9ff'
+        this.muteBtnLabel = this.add.text(width - 40, BAR_Y, '🔊', {
+            fontSize: '18px'
         }).setScrollFactor(0).setDepth(hudDepth + 2).setOrigin(0.5, 0.5);
 
-        muteBg.on('pointerover', () => muteBg.setFillStyle(this.isMuted ? 0xb91c1c : 0x0284c7));
-        muteBg.on('pointerout', () => muteBg.setFillStyle(this.isMuted ? 0xdc2626 : 0x0369a1));
         muteBg.on('pointerdown', () => {
             this.isMuted = !this.isMuted;
             this.sound.mute = this.isMuted;
-            if (this.isMuted) {
-                this.audioManager.stopActiveZoneSound();
-            }
-            this.muteBtnLabel.setText(this.isMuted ? '🔇 Silenciado' : '🔊 Sonido ON');
+            if (this.isMuted) this.audioManager.stopActiveSound();
+            this.muteBtnLabel.setText(this.isMuted ? '🔇' : '🔊');
             muteBg.setFillStyle(this.isMuted ? 0xdc2626 : 0x0369a1);
         });
+    }
 
-        // Toast de notificación
-        this.toastContainer = this.add.container(width / 2, BAR_H + 26)
-            .setScrollFactor(0).setDepth(hudDepth + 10).setVisible(false);
+    /**
+     * Crea el panel de Quiz con 4 botones de respuesta
+     */
+    createQuizUI() {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const hudDepth = 300;
 
-        const toastBg = this.add.rectangle(0, 0, Math.min(width * 0.8, 520), 38, 0x0f172a, 0.97)
-            .setStrokeStyle(2, 0x38bdf8);
+        this.quizContainer = this.add.container(width / 2, height / 2)
+            .setScrollFactor(0).setDepth(hudDepth).setVisible(false);
 
-        this.toastText = this.add.text(0, 0, '', {
+        // Fondo semitransparente
+        const overlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.6);
+
+        // Tarjeta del quiz
+        const cardW = Math.min(width * 0.85, 420);
+        const cardH = 300;
+        const card = this.add.rectangle(0, 0, cardW, cardH, 0x0f172a, 0.97)
+            .setStrokeStyle(3, 0x38bdf8);
+
+        // Pregunta
+        const questionText = this.add.text(0, -110, '🎧 ¿Qué sonido escuchaste?', {
             fontFamily: 'Arial, sans-serif',
-            fontSize: '13px',
-            color: '#e0f2fe',
+            fontSize: '18px',
+            fontStyle: 'bold',
+            color: '#f0f9ff',
             align: 'center'
         }).setOrigin(0.5);
 
-        this.toastContainer.add([toastBg, this.toastText]);
+        this.quizContainer.add([overlay, card, questionText]);
+
+        // 4 Botones de respuesta
+        const options = [
+            { id: 'ambulance', label: '🚑 Ambulancia', y: -50 },
+            { id: 'police',    label: '🚓 Policía',    y: 0   },
+            { id: 'fire',      label: '🚒 Bomberos',   y: 50  },
+            { id: 'horn',      label: '🚗 Claxon',     y: 100 }
+        ];
+
+        options.forEach(opt => {
+            const btnW = Math.min(cardW - 40, 320);
+            const btnBg = this.add.rectangle(0, opt.y, btnW, 40, 0x1e293b)
+                .setStrokeStyle(2, 0x475569)
+                .setInteractive({ useHandCursor: true });
+
+            const btnText = this.add.text(0, opt.y, opt.label, {
+                fontFamily: 'Arial, sans-serif',
+                fontSize: '16px',
+                fontStyle: 'bold',
+                color: '#e2e8f0'
+            }).setOrigin(0.5);
+
+            // Hover effects
+            btnBg.on('pointerover', () => {
+                btnBg.setFillStyle(0x334155);
+                btnBg.setStrokeStyle(2, 0x38bdf8);
+            });
+            btnBg.on('pointerout', () => {
+                btnBg.setFillStyle(0x1e293b);
+                btnBg.setStrokeStyle(2, 0x475569);
+            });
+
+            // Click / Touch
+            btnBg.on('pointerdown', () => {
+                this.handleQuizAnswer(opt.id);
+            });
+
+            this.quizContainer.add([btnBg, btnText]);
+        });
+    }
+
+    /**
+     * Overlay "¡Escucha atentamente!" mientras el sonido se reproduce
+     */
+    createListeningOverlay() {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const hudDepth = 250;
+
+        this.listeningContainer = this.add.container(width / 2, height / 2)
+            .setScrollFactor(0).setDepth(hudDepth).setVisible(false);
+
+        const bgOverlay = this.add.rectangle(0, 0, width, height, 0x000000, 0.45);
+
+        const cardW = Math.min(width * 0.8, 400);
+        const cardBg = this.add.rectangle(0, 0, cardW, 130, 0x0f172a, 0.95)
+            .setStrokeStyle(3, 0xfacc15);
+
+        const iconText = this.add.text(0, -30, '🔔', {
+            fontSize: '36px'
+        }).setOrigin(0.5);
+
+        const mainText = this.add.text(0, 15, '¡Escucha atentamente!', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '20px',
+            fontStyle: 'bold',
+            color: '#facc15',
+            align: 'center'
+        }).setOrigin(0.5);
+
+        const subText = this.add.text(0, 45, 'El sonido se reproduce durante 10 segundos...', {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '13px',
+            color: '#94a3b8',
+            align: 'center'
+        }).setOrigin(0.5);
+
+        this.listeningContainer.add([bgOverlay, cardBg, iconText, mainText, subText]);
+    }
+
+    showListeningOverlay() {
+        if (this.listeningContainer) this.listeningContainer.setVisible(true);
+    }
+
+    hideListeningOverlay() {
+        if (this.listeningContainer) this.listeningContainer.setVisible(false);
+    }
+
+    /**
+     * Muestra el feedback visual después de responder el quiz
+     */
+    showFeedback(isCorrect, correctLabel) {
+        const width = this.cameras.main.width;
+        const height = this.cameras.main.height;
+        const hudDepth = 310;
+
+        if (this.feedbackContainer) {
+            this.feedbackContainer.destroy();
+        }
+
+        this.feedbackContainer = this.add.container(width / 2, height / 2)
+            .setScrollFactor(0).setDepth(hudDepth);
+
+        const bg = this.add.rectangle(0, 0, width, height, 0x000000, 0.5);
+
+        const cardW = Math.min(width * 0.8, 380);
+        const borderColor = isCorrect ? 0x22c55e : 0xef4444;
+        const cardBg = this.add.rectangle(0, 0, cardW, 120, 0x0f172a, 0.97)
+            .setStrokeStyle(3, borderColor);
+
+        const emoji = isCorrect ? '✅' : '❌';
+        const message = isCorrect
+            ? '¡CORRECTO!'
+            : `INCORRECTO`;
+        const detail = isCorrect
+            ? `Era: ${correctLabel}`
+            : `Era: ${correctLabel}`;
+
+        const emojiText = this.add.text(0, -30, emoji, {
+            fontSize: '32px'
+        }).setOrigin(0.5);
+
+        const msgText = this.add.text(0, 5, message, {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '22px',
+            fontStyle: 'bold',
+            color: isCorrect ? '#22c55e' : '#ef4444'
+        }).setOrigin(0.5);
+
+        const detailText = this.add.text(0, 35, detail, {
+            fontFamily: 'Arial, sans-serif',
+            fontSize: '14px',
+            color: '#94a3b8'
+        }).setOrigin(0.5);
+
+        this.feedbackContainer.add([bg, cardBg, emojiText, msgText, detailText]);
+    }
+
+    hideFeedback() {
+        if (this.feedbackContainer) {
+            this.feedbackContainer.destroy();
+            this.feedbackContainer = null;
+        }
     }
 
     ensureTexturesExist() {

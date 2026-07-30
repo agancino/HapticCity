@@ -1,11 +1,8 @@
 /**
  * Map.js
  * Gestiona el mapa top-down de la ciudad pixel art para Haptic City.
- * Crea el entramado de calles, aceras, vegetación, casas y los 4 edificios/zonas principales:
- * - Hospital (Noroeste)
- * - Estación de Policía (Noreste)
- * - Estación de Bomberos (Suroeste)
- * - Cruce Principal (Centro)
+ * Crea el entramado de calles, aceras, vegetación, casas y los 4 edificios principales.
+ * Las zonas de audio fueron removidas — ahora los sonidos aparecen aleatoriamente.
  */
 class CityMap {
     constructor(scene) {
@@ -16,9 +13,6 @@ class CityMap {
 
         // Grupo de físicas estáticas para colisiones (paredes, árboles, construcciones)
         this.colliders = this.scene.physics.add.staticGroup();
-
-        // Arreglo de zonas de activación de audio
-        this.triggerZones = [];
 
         this.buildMap();
     }
@@ -44,22 +38,19 @@ class CityMap {
             this.scene.add.image(20 * this.tileSize + 16, r * this.tileSize + 16, 'tile_road');
         }
 
-        // Passos Peatonales (Crosswalks) en la intersección central
-        // Cruce Peatonal Oeste
+        // Pasos Peatonales (Crosswalks) en la intersección central
         this.scene.add.image(17 * this.tileSize + 16, 11 * this.tileSize + 16, 'tile_crosswalk');
         this.scene.add.image(17 * this.tileSize + 16, 12 * this.tileSize + 16, 'tile_crosswalk');
-        // Cruce Peatonal Este
         this.scene.add.image(22 * this.tileSize + 16, 11 * this.tileSize + 16, 'tile_crosswalk');
         this.scene.add.image(22 * this.tileSize + 16, 12 * this.tileSize + 16, 'tile_crosswalk');
 
         // 3. Acerado alrededor de las manzanas
         this.buildSidewalks();
 
-        // 4. Construcción de Edificios Principales y Zonas
-        this.buildHospital(4, 2);      // Noroeste
-        this.buildPoliceStation(28, 2); // Noreste
-        this.buildFireStation(4, 15);   // Suroeste
-        this.buildMainIntersection(18, 10); // Centro
+        // 4. Construcción de Edificios (solo decoración, sin carteles ni zonas)
+        this.buildHospital(4, 2);
+        this.buildPoliceStation(28, 2);
+        this.buildFireStation(4, 15);
 
         // 5. Zonas Residenciales y Parque
         this.buildResidentialZone(27, 15);
@@ -70,14 +61,12 @@ class CityMap {
     }
 
     buildSidewalks() {
-        // Aceras bordeando la calle horizontal
         for (let c = 0; c < this.cols; c++) {
             if (c < 18 || c > 21) {
                 this.scene.add.image(c * this.tileSize + 16, 10 * this.tileSize + 16, 'tile_sidewalk');
                 this.scene.add.image(c * this.tileSize + 16, 13 * this.tileSize + 16, 'tile_sidewalk');
             }
         }
-        // Aceras bordeando la calle vertical
         for (let r = 0; r < this.rows; r++) {
             if (r < 10 || r > 13) {
                 this.scene.add.image(18 * this.tileSize + 16, r * this.tileSize + 16, 'tile_sidewalk');
@@ -87,13 +76,11 @@ class CityMap {
     }
 
     /**
-     * Hospital (Zona Noroeste - Sirena Ambulancia 🚑)
+     * Hospital (Noroeste) — Solo estructura visual, sin zona de audio
      */
     buildHospital(startCol, startRow) {
         const widthTiles = 6;
         const heightTiles = 5;
-
-        // Estructura del edificio
         for (let r = 0; r < heightTiles; r++) {
             for (let c = 0; c < widthTiles; c++) {
                 const tileX = (startCol + c) * this.tileSize + 16;
@@ -102,45 +89,14 @@ class CityMap {
                 this.colliders.add(buildingPart);
             }
         }
-
-        // Cartel del Hospital
-        const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚑 HOSPITAL', {
-            fontFamily: 'monospace, Arial, sans-serif',
-            fontSize: '12px',
-            color: '#ef4444',
-            backgroundColor: '#0f172a',
-            padding: { x: 6, y: 4 }
-        }).setOrigin(0.5);
-
-        // Área de Activación de Sonido (Entrada/Estacionamiento de Ambulancias)
-        const zoneX = (startCol + 3) * this.tileSize;
-        const zoneY = (startRow + heightTiles + 0.5) * this.tileSize;
-        const zoneWidth = 7 * this.tileSize;
-        const zoneHeight = 3 * this.tileSize;
-
-        // Indicador visual discreto del área en el suelo
-        const zoneRect = this.scene.add.rectangle(zoneX, zoneY, zoneWidth, zoneHeight, 0xef4444, 0.15)
-            .setStrokeStyle(2, 0xef4444, 0.6);
-
-        this.triggerZones.push({
-            id: 'hospital',
-            name: '🚑 Ambulancia',
-            soundKey: 'sound_ambulance',
-            x: zoneX,
-            y: zoneY,
-            width: zoneWidth,
-            height: zoneHeight,
-            rect: zoneRect
-        });
     }
 
     /**
-     * Estación de Policía (Zona Noreste - Sirena Policía 🚓)
+     * Estación de Policía (Noreste) — Solo estructura visual
      */
     buildPoliceStation(startCol, startRow) {
         const widthTiles = 6;
         const heightTiles = 5;
-
         for (let r = 0; r < heightTiles; r++) {
             for (let c = 0; c < widthTiles; c++) {
                 const tileX = (startCol + c) * this.tileSize + 16;
@@ -149,42 +105,14 @@ class CityMap {
                 this.colliders.add(buildingPart);
             }
         }
-
-        const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚓 POLICÍA', {
-            fontFamily: 'monospace, Arial, sans-serif',
-            fontSize: '12px',
-            color: '#3b82f6',
-            backgroundColor: '#0f172a',
-            padding: { x: 6, y: 4 }
-        }).setOrigin(0.5);
-
-        const zoneX = (startCol + 3) * this.tileSize;
-        const zoneY = (startRow + heightTiles + 0.5) * this.tileSize;
-        const zoneWidth = 7 * this.tileSize;
-        const zoneHeight = 3 * this.tileSize;
-
-        const zoneRect = this.scene.add.rectangle(zoneX, zoneY, zoneWidth, zoneHeight, 0x3b82f6, 0.15)
-            .setStrokeStyle(2, 0x3b82f6, 0.6);
-
-        this.triggerZones.push({
-            id: 'police',
-            name: '🚓 Policía',
-            soundKey: 'sound_police',
-            x: zoneX,
-            y: zoneY,
-            width: zoneWidth,
-            height: zoneHeight,
-            rect: zoneRect
-        });
     }
 
     /**
-     * Estación de Bomberos (Zona Suroeste - Sirena Bomberos 🚒)
+     * Estación de Bomberos (Suroeste) — Solo estructura visual
      */
     buildFireStation(startCol, startRow) {
         const widthTiles = 6;
         const heightTiles = 5;
-
         for (let r = 0; r < heightTiles; r++) {
             for (let c = 0; c < widthTiles; c++) {
                 const tileX = (startCol + c) * this.tileSize + 16;
@@ -193,65 +121,6 @@ class CityMap {
                 this.colliders.add(buildingPart);
             }
         }
-
-        const labelText = this.scene.add.text((startCol + 3) * this.tileSize, (startRow - 0.7) * this.tileSize, '🚒 BOMBEROS', {
-            fontFamily: 'monospace, Arial, sans-serif',
-            fontSize: '12px',
-            color: '#f97316',
-            backgroundColor: '#0f172a',
-            padding: { x: 6, y: 4 }
-        }).setOrigin(0.5);
-
-        const zoneX = (startCol + 3) * this.tileSize;
-        const zoneY = (startRow - 1.5) * this.tileSize;
-        const zoneWidth = 7 * this.tileSize;
-        const zoneHeight = 3 * this.tileSize;
-
-        const zoneRect = this.scene.add.rectangle(zoneX, zoneY, zoneWidth, zoneHeight, 0xf97316, 0.15)
-            .setStrokeStyle(2, 0xf97316, 0.6);
-
-        this.triggerZones.push({
-            id: 'fire',
-            name: '🚒 Bomberos',
-            soundKey: 'sound_fire',
-            x: zoneX,
-            y: zoneY,
-            width: zoneWidth,
-            height: zoneHeight,
-            rect: zoneRect
-        });
-    }
-
-    /**
-     * Cruce Principal de Vehículos (Zona Centro - Bocina de Automóvil 🚗)
-     */
-    buildMainIntersection(startCol, startRow) {
-        const zoneX = (startCol + 1.5) * this.tileSize;
-        const zoneY = (startRow + 1.5) * this.tileSize;
-        const zoneWidth = 5 * this.tileSize;
-        const zoneHeight = 4 * this.tileSize;
-
-        const labelText = this.scene.add.text(zoneX, zoneY - 70, '🚗 CRUCE PRINCIPAL', {
-            fontFamily: 'monospace, Arial, sans-serif',
-            fontSize: '11px',
-            color: '#facc15',
-            backgroundColor: '#0f172a',
-            padding: { x: 4, y: 3 }
-        }).setOrigin(0.5);
-
-        const zoneRect = this.scene.add.rectangle(zoneX, zoneY, zoneWidth, zoneHeight, 0xfacc15, 0.15)
-            .setStrokeStyle(2, 0xfacc15, 0.6);
-
-        this.triggerZones.push({
-            id: 'intersection',
-            name: '🚗 Bocina de Auto',
-            soundKey: 'sound_horn',
-            x: zoneX,
-            y: zoneY,
-            width: zoneWidth,
-            height: zoneHeight,
-            rect: zoneRect
-        });
     }
 
     /**
@@ -264,7 +133,6 @@ class CityMap {
             { c: startCol, r: startRow + 4 },
             { c: startCol + 5, r: startRow + 4 }
         ];
-
         houseCoords.forEach(pos => {
             for (let r = 0; r < 3; r++) {
                 for (let c = 0; c < 3; c++) {
@@ -293,11 +161,8 @@ class CityMap {
      * Barreras de colisión externas
      */
     buildWorldBounds() {
-        // Paredes transparentes en los bordes del mapa
         const totalWidth = this.cols * this.tileSize;
         const totalHeight = this.rows * this.tileSize;
-
-        // Borde superior, inferior, izquierdo y derecho
         const top = this.scene.add.rectangle(totalWidth / 2, -10, totalWidth, 20);
         const bottom = this.scene.add.rectangle(totalWidth / 2, totalHeight + 10, totalWidth, 20);
         const left = this.scene.add.rectangle(-10, totalHeight / 2, 20, totalHeight);

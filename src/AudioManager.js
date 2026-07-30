@@ -1,17 +1,18 @@
 /**
  * AudioManager.js
- * Gestor centralizado de audio para la reproducción de sonidos urbanos.
- * Usa los archivos .mp3 del usuario embebidos en base64 (sounds-data.js) para funcionar con file://.
- * Reproduce en bucle mientras el jugador permanece en la zona y detiene al salir.
+ * Gestor centralizado de audio para Haptic City v2.
+ * - playRandomSound(): reproduce un sonido aleatorio UNA vez (para el sistema de quiz).
+ * - stopActiveSound(): detiene el audio inmediatamente.
+ * - Usa archivos base64 embebidos (sounds-data.js) para compatibilidad universal.
  */
 class AudioManager {
     constructor(scene) {
         this.scene = scene;
         this.volume = 0.8;
-        this.currentZoneId = null;
         this.activeAudioNode = null;
+        this.isPlaying = false;
 
-        // WebAudio API nativa para decodificar y reproducir los base64 sin restricciones
+        // WebAudio API nativa
         try {
             const AC = window.AudioContext || window.webkitAudioContext;
             this.audioCtx = AC ? new AC() : null;
@@ -19,74 +20,65 @@ class AudioManager {
             this.audioCtx = null;
         }
 
-        // Cache de AudioBuffers decodificados (para no decodificar dos veces)
+        // Cache de AudioBuffers decodificados
         this.bufferCache = {};
 
-        // Mapa de zoneId → clave en HAPTIC_SOUNDS
-        this.soundMap = {
-            'hospital':     'ambulance',
-            'police':       'police',
-            'fire':         'fire',
-            'intersection': 'horn'
-        };
+        // Listado de sonidos disponibles con sus claves y nombres legibles
+        this.availableSounds = [
+            { id: 'ambulance', label: '🚑 Ambulancia',  key: 'ambulance' },
+            { id: 'police',    label: '🚓 Policía',     key: 'police'    },
+            { id: 'fire',      label: '🚒 Bomberos',    key: 'fire'      },
+            { id: 'horn',      label: '🚗 Claxon',      key: 'horn'      }
+        ];
 
         // Pausar audio al cambiar de pestaña
         document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                this.stopActiveZoneSound();
-            }
+            if (document.hidden) this.stopActiveSound();
         });
     }
 
     /**
-     * Activa la reproducción en BUCLE del audio de la zona.
-     * No reinicia si el jugador ya está en la misma zona (continuidad sin cortes).
+     * Elige un sonido aleatorio y lo reproduce UNA vez (sin loop).
+     * Retorna el objeto del sonido elegido { id, label, key } para que GameScene sepa la respuesta correcta.
      */
-    triggerZoneSound(zoneData, onSoundTriggeredCallback) {
-        if (this.currentZoneId === zoneData.id) return;
+    playRandomSound() {
+        this.stopActiveSound();
 
-        this.stopActiveZoneSound();
-        this.currentZoneId = zoneData.id;
+        // Elegir sonido aleatorio
+        const idx = Math.floor(Math.random() * this.availableSounds.length);
+        const chosen = this.availableSounds[idx];
 
-        if (onSoundTriggeredCallback) {
-            onSoundTriggeredCallback(zoneData);
+        // Reproducir usando base64 embebido
+        if (typeof HAPTIC_SOUNDS !== 'undefined' && HAPTIC_SOUNDS[chosen.key]) {
+            this.playBase64Once(chosen.key, HAPTIC_SOUNDS[chosen.key]);
+        } else {
+            // Fallback al sintetizador
+            this.playSynthPulse(chosen.id === 'horn' ? 'intersection' : chosen.id === 'ambulance' ? 'hospital' : chosen.id === 'police' ? 'police' : 'fire');
         }
 
         // Vibración háptica opcional en móviles
         if ('vibrate' in navigator) {
-            try { navigator.vibrate([150, 80, 150]); } catch (_) {}
+            try { navigator.vibrate([200, 100, 200, 100, 200]); } catch (_) {}
         }
 
-        // Buscar la clave de audio en el objeto HAPTIC_SOUNDS (embebido en base64)
-        const soundKey = this.soundMap[zoneData.id];
-
-        if (typeof HAPTIC_SOUNDS !== 'undefined' && HAPTIC_SOUNDS[soundKey]) {
-            this.playBase64Loop(zoneData.id, HAPTIC_SOUNDS[soundKey]);
-        } else {
-            // Fallback al sintetizador si no hay base64
-            this.playSynthLoop(zoneData.id);
-        }
+        this.isPlaying = true;
+        return chosen;
     }
 
     /**
-     * Decodifica el Data URL base64 y lo reproduce en bucle usando WebAudio.
+     * Decodifica el Data URL base64 y lo reproduce UNA VEZ usando WebAudio (sin loop).
      */
-    async playBase64Loop(zoneId, dataUrl) {
-        if (!this.audioCtx) {
-            this.playSynthLoop(zoneId);
-            return;
-        }
+    async playBase64Once(soundId, dataUrl) {
+        if (!this.audioCtx) return;
 
         try {
             if (this.audioCtx.state === 'suspended') {
                 await this.audioCtx.resume();
             }
 
-            // Usar el buffer cacheado si ya fue decodificado antes
-            let buffer = this.bufferCache[zoneId];
+            let buffer = this.bufferCache[soundId];
 
             if (!buffer) {
-                // Convertir data URL a ArrayBuffer
                 const base64 = dataUrl.split(',')[1];
                 const binary = atob(base64);
                 const bytes = new Uint8Array(binary.length);
@@ -94,16 +86,12 @@ class AudioManager {
                     bytes[i] = binary.charCodeAt(i);
                 }
                 buffer = await this.audioCtx.decodeAudioData(bytes.buffer);
-                this.bufferCache[zoneId] = buffer;
+                this.bufferCache[soundId] = buffer;
             }
 
-            // Si mientras decodificaba el jugador salió, no reproducir
-            if (this.currentZoneId !== zoneId) return;
-
-            // Crear nodo de fuente con loop activado
             const source = this.audioCtx.createBufferSource();
             source.buffer = buffer;
-            source.loop = true;
+            source.loop = true; // Loop hasta que se detenga manualmente por el timer
 
             const gainNode = this.audioCtx.createGain();
             gainNode.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
@@ -112,47 +100,31 @@ class AudioManager {
             gainNode.connect(this.audioCtx.destination);
             source.start(0);
 
-            // Guardar referencias para detener cuando el jugador salga
             this.activeAudioNode = { source, gainNode };
 
         } catch (e) {
-            console.warn('[AudioManager] Error decodificando audio base64, usando sintetizador:', e);
-            this.playSynthLoop(zoneId);
+            console.warn('[AudioManager] Error decodificando audio base64:', e);
         }
     }
 
     /**
-     * Detiene inmediatamente el audio activo cuando el jugador sale de la zona.
+     * Detiene inmediatamente el audio activo.
      */
-    stopActiveZoneSound() {
-        this.currentZoneId = null;
+    stopActiveSound() {
+        this.isPlaying = false;
 
         if (this.activeAudioNode) {
             try {
                 const { source, gainNode } = this.activeAudioNode;
                 const t = this.audioCtx.currentTime;
-                gainNode.gain.setTargetAtTime(0, t, 0.1);  // Fade-out suave
-                source.stop(t + 0.2);
+                gainNode.gain.setTargetAtTime(0, t, 0.08);
+                source.stop(t + 0.15);
             } catch (_) {}
             this.activeAudioNode = null;
-        }
-
-        if (this.synthInterval) {
-            clearInterval(this.synthInterval);
-            this.synthInterval = null;
         }
     }
 
     // ─── SINTETIZADOR DE RESPALDO ─────────────────────────────────────────────
-
-    playSynthLoop(type) {
-        this.playSynthPulse(type);
-        const ms = type === 'intersection' ? 1100 : 2600;
-        this.synthInterval = setInterval(() => {
-            if (!this.currentZoneId) { clearInterval(this.synthInterval); return; }
-            this.playSynthPulse(type);
-        }, ms);
-    }
 
     playSynthPulse(type) {
         if (!this.audioCtx || this.audioCtx.state === 'closed') return;

@@ -20,31 +20,83 @@ class LoadingScene extends Phaser.Scene {
      * Generador de texturas usando la API nativa HTML5 Canvas 2D de Phaser
      */
     generateProceduralGraphics() {
-        // 1. Textura del Jugador (32x32)
+        // 1. Textura del Jugador — Persona en Bicicleta 🚲 (32x32)
         if (!this.textures.exists('player_sprite')) {
             const playerCanvas = this.textures.createCanvas('player_sprite', 32, 32);
-            const pCtx = playerCanvas.context;
-            // Camiseta Azul
-            pCtx.fillStyle = '#0284c7';
-            pCtx.fillRect(8, 12, 16, 14);
-            // Cabeza / Piel
-            pCtx.fillStyle = '#fde047';
-            pCtx.fillRect(10, 4, 12, 10);
-            // Pelo
-            pCtx.fillStyle = '#78350f';
-            pCtx.fillRect(9, 2, 14, 4);
+            const p = playerCanvas.context;
+
+            // Rueda trasera de la bicicleta
+            p.strokeStyle = '#64748b';
+            p.lineWidth = 2;
+            p.beginPath();
+            p.arc(10, 26, 5, 0, Math.PI * 2);
+            p.stroke();
+            // Rueda delantera
+            p.beginPath();
+            p.arc(24, 26, 5, 0, Math.PI * 2);
+            p.stroke();
+
+            // Cuadro de la bicicleta (triángulo + barra)
+            p.strokeStyle = '#0ea5e9';
+            p.lineWidth = 2;
+            p.beginPath();
+            p.moveTo(10, 26); // eje trasero
+            p.lineTo(16, 16); // tubo del asiento
+            p.lineTo(24, 26); // eje delantero
+            p.lineTo(16, 16); // cerrar al centro
+            p.stroke();
+            // Manubrio
+            p.beginPath();
+            p.moveTo(24, 26);
+            p.lineTo(23, 14);
+            p.stroke();
+            // Asiento
+            p.fillStyle = '#1e293b';
+            p.fillRect(14, 14, 5, 3);
+
+            // Cuerpo del ciclista (inclinado hacia adelante)
+            p.fillStyle = '#0284c7';
+            p.fillRect(15, 8, 6, 8); // torso
+
+            // Brazos extendidos al manubrio
+            p.strokeStyle = '#fde047';
+            p.lineWidth = 2;
+            p.beginPath();
+            p.moveTo(19, 11);
+            p.lineTo(23, 14);
+            p.stroke();
+
+            // Cabeza con casco
+            p.fillStyle = '#ef4444'; // casco rojo
+            p.beginPath();
+            p.arc(17, 5, 5, Math.PI, 0); // media esfera superior (casco)
+            p.fill();
+            p.fillStyle = '#fde047'; // cara/piel
+            p.beginPath();
+            p.arc(17, 5, 4, 0, Math.PI); // media esfera inferior (cara)
+            p.fill();
             // Ojos
-            pCtx.fillStyle = '#0f172a';
-            pCtx.fillRect(12, 7, 2, 3);
-            pCtx.fillRect(18, 7, 2, 3);
-            // Pantalones
-            pCtx.fillStyle = '#1e3a8a';
-            pCtx.fillRect(9, 24, 6, 8);
-            pCtx.fillRect(17, 24, 6, 8);
+            p.fillStyle = '#0f172a';
+            p.fillRect(15, 4, 2, 2);
+            p.fillRect(19, 4, 2, 2);
+
+            // Piernas pedaleando
+            p.strokeStyle = '#1e3a8a';
+            p.lineWidth = 2;
+            p.beginPath();
+            p.moveTo(16, 16);
+            p.lineTo(12, 22);
+            p.stroke();
+            p.beginPath();
+            p.moveTo(16, 16);
+            p.lineTo(20, 22);
+            p.stroke();
+
             // Zapatos
-            pCtx.fillStyle = '#090d16';
-            pCtx.fillRect(8, 30, 7, 2);
-            pCtx.fillRect(17, 30, 7, 2);
+            p.fillStyle = '#0f172a';
+            p.fillRect(10, 22, 4, 2);
+            p.fillRect(18, 22, 4, 2);
+
             playerCanvas.refresh();
         }
 
