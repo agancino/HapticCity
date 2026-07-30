@@ -81,18 +81,36 @@ class GameScene extends Phaser.Scene {
         if (isMovingNow) {
             this.movingTime += delta;
 
-            // Verificar si es hora de un encuentro aleatorio
-            if (this.movingTime >= this.nextEncounterTime) {
+            // Cada 15 segundos caminando, verificar si está en la calle para activar encuentro
+            if (this.movingTime >= this.nextEncounterTime && this.isPlayerOnRoad()) {
                 this.triggerRandomEncounter();
             }
         }
     }
 
     /**
-     * Genera un tiempo aleatorio entre 8 y 20 segundos (en milisegundos)
+     * Tiempo fijo de 15 segundos entre encuentros
      */
     getRandomEncounterDelay() {
-        return Phaser.Math.Between(8000, 20000);
+        return 15000; // 15 segundos
+    }
+
+    /**
+     * Verifica si el personaje está sobre una calle (tile de asfalto).
+     * Calles horizontales: filas 11-12 | Calles verticales: columnas 19-20
+     */
+    isPlayerOnRoad() {
+        const pos = this.player.getPosition();
+        const tileSize = 32;
+        const col = Math.floor(pos.x / tileSize);
+        const row = Math.floor(pos.y / tileSize);
+
+        // Calle horizontal (filas 11 y 12)
+        const onHorizontalRoad = (row === 11 || row === 12);
+        // Calle vertical (columnas 19 y 20)
+        const onVerticalRoad = (col === 19 || col === 20);
+
+        return onHorizontalRoad || onVerticalRoad;
     }
 
     /**
