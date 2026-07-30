@@ -8,7 +8,7 @@
 class AudioManager {
     constructor(scene) {
         this.scene = scene;
-        this.volume = 0.8;
+        this.volume = 1.0;  // Volumen al máximo para que suene fuerte
         this.activeAudioNode = null;
         this.isPlaying = false;
 
@@ -66,7 +66,30 @@ class AudioManager {
     }
 
     /**
-     * Decodifica el Data URL base64 y lo reproduce UNA VEZ usando WebAudio (sin loop).
+     * Analiza un AudioBuffer y encuentra el segundo exacto donde comienza el sonido real,
+     * saltando cualquier silencio inicial del archivo .mp3.
+     * @param {AudioBuffer} buffer
+     * @returns {number} offset en segundos donde comienza el sonido
+     */
+    findSoundStart(buffer) {
+        const channelData = buffer.getChannelData(0); // Canal izquierdo
+        const sampleRate = buffer.sampleRate;
+        const threshold = 0.02; // Umbral mínimo para considerar que hay sonido
+
+        for (let i = 0; i < channelData.length; i++) {
+            if (Math.abs(channelData[i]) > threshold) {
+                // Retroceder un poquito (50ms) para no cortar el ataque del sonido
+                const startSample = Math.max(0, i - Math.floor(sampleRate * 0.05));
+                return startSample / sampleRate;
+            }
+        }
+        return 0; // Si no hay silencio, empezar desde el inicio
+    }
+
+    /**
+     * Decodifica el Data URL base64 y lo reproduce en loop.
+     * SALTA automáticamente los silencios iniciales del archivo.
+     * Reproduce a volumen MÁXIMO.
      */
     async playBase64Once(soundId, dataUrl) {
         if (!this.audioCtx) return;
@@ -89,18 +112,36 @@ class AudioManager {
                 this.bufferCache[soundId] = buffer;
             }
 
+            // Detectar dónde comienza el sonido real (saltar silencios)
+            const startOffset = this.findSoundStart(buffer);
+
             const source = this.audioCtx.createBufferSource();
             source.buffer = buffer;
-            source.loop = true; // Loop hasta que se detenga manualmente por el timer
+            source.loop = true;
+            source.loopStart = startOffset; // Al hacer loop, también saltar el silencio
 
+            // Volumen al máximo con compresor para que suene FUERTE
             const gainNode = this.audioCtx.createGain();
             gainNode.gain.setValueAtTime(this.volume, this.audioCtx.currentTime);
 
-            source.connect(gainNode);
+            // Compresor dinámico para asegurar volumen alto y uniforme
+            const compressor = this.audioCtx.createDynamicsCompressor();
+            compressor.threshold.setValueAtTime(-20, this.audioCtx.currentTime);
+            compressor.knee.setValueAtTime(10, this.audioCtx.currentTime);
+            compressor.ratio.setValueAtTime(8, this.audioCtx.currentTime);
+            compressor.attack.setValueAtTime(0.003, this.audioCtx.currentTime);
+            compressor.release.setValueAtTime(0.15, this.audioCtx.currentTime);
+
+            source.connect(compressor);
+            compressor.connect(gainNode);
             gainNode.connect(this.audioCtx.destination);
-            source.start(0);
+
+            // Iniciar desde donde realmente empieza el sonido
+            source.start(0, startOffset);
 
             this.activeAudioNode = { source, gainNode };
+
+            console.log(`[AudioManager] 🔊 Reproduciendo ${soundId} desde ${startOffset.toFixed(2)}s (silencio saltado)`);
 
         } catch (e) {
             console.warn('[AudioManager] Error decodificando audio base64:', e);
