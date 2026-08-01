@@ -16,9 +16,9 @@ class Player {
         this.sprite.setCollideWorldBounds(true);
         this.sprite.setDepth(10);
 
-        // Ajuste fino de la caja de colisión (pies del personaje para giros fluidos)
-        this.sprite.body.setSize(18, 14);
-        this.sprite.body.setOffset(7, 18);
+        // Ajuste fino de la caja de colisión para que navegue sin atorarse por el asfalto
+        this.sprite.body.setSize(12, 12);
+        this.sprite.body.setOffset(10, 10);
 
         // Dirección actual para animaciones
         this.currentDirection = 'down';

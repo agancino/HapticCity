@@ -25,8 +25,8 @@ class GameScene extends Phaser.Scene {
         // 2. Mapa
         this.cityMap = new CityMap(this);
 
-        // 3. Jugador en Bicicleta
-        this.player = new Player(this, 640, 400);
+        // 3. Jugador en Bicicleta centrado en el Cruce Principal de la calle
+        this.player = new Player(this, 624, 368);
         this.physics.add.collider(this.player.sprite, this.cityMap.colliders);
 
         // 4. Entradas (manuales + auto)
@@ -38,17 +38,17 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.player.sprite, true, 0.08, 0.08);
         this.cameras.main.setZoom(1.0);
 
-        // 6. Ruta de patrullaje automático (puntos de control en las calles)
+        // 6. Ruta de patrullaje automático EXCLUSIVA por el centro del asfalto de las calles
+        // Calle Horizontal: Y = 368 | Calle Vertical: X = 624
         this.waypoints = [
-            { x: 640, y: 400 }, // Centro
-            { x: 1000, y: 400 }, // Calle Este
-            { x: 1000, y: 700 }, // Sureste
-            { x: 640, y: 700 },  // Sur Centro
-            { x: 200, y: 700 },  // Suroeste
-            { x: 200, y: 400 },  // Oeste
-            { x: 200, y: 100 },  // Noroeste
-            { x: 640, y: 100 },  // Norte
-            { x: 1000, y: 100 }  // Noreste
+            { x: 624, y: 368 },  // 1. Cruce Principal
+            { x: 1150, y: 368 }, // 2. Extremo Este (Calle Horizontal)
+            { x: 624, y: 368 },  // 3. Volver al Cruce
+            { x: 624, y: 720 },  // 4. Extremo Sur (Calle Vertical)
+            { x: 624, y: 368 },  // 5. Volver al Cruce
+            { x: 120, y: 368 },  // 6. Extremo Oeste (Calle Horizontal)
+            { x: 624, y: 368 },  // 7. Volver al Cruce
+            { x: 624, y: 80 }    // 8. Extremo Norte (Calle Vertical)
         ];
         this.currentWaypointIndex = 0;
 
