@@ -76,27 +76,19 @@ class GameScene extends Phaser.Scene {
             return;
         }
 
-        // --- MOVIMIENTO AUTOMÁTICO DEL PERSONAJE ---
-        const manualInput = this.inputManager.getInputVector();
+        // --- MOVIMIENTO 100% AUTOMÁTICO DEL PERSONAJE ---
+        const targetWP = this.waypoints[this.currentWaypointIndex];
+        const pos = this.player.getPosition();
+        const dx = targetWP.x - pos.x;
+        const dy = targetWP.y - pos.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
         let moveVector = { x: 0, y: 0 };
-
-        if (Math.abs(manualInput.x) > 0.1 || Math.abs(manualInput.y) > 0.1) {
-            // Si el usuario usa controles manuales, respetar su entrada
-            moveVector = manualInput;
+        if (dist < 20) {
+            // Llegó al punto, avanzar al siguiente punto de patrulla
+            this.currentWaypointIndex = (this.currentWaypointIndex + 1) % this.waypoints.length;
         } else {
-            // Autocontrol: navegar hacia el siguiente punto de la calle
-            const targetWP = this.waypoints[this.currentWaypointIndex];
-            const pos = this.player.getPosition();
-            const dx = targetWP.x - pos.x;
-            const dy = targetWP.y - pos.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < 20) {
-                // Llegó al punto, avanzar al siguiente waypoint
-                this.currentWaypointIndex = (this.currentWaypointIndex + 1) % this.waypoints.length;
-            } else {
-                moveVector = { x: dx / dist, y: dy / dist };
-            }
+            moveVector = { x: dx / dist, y: dy / dist };
         }
 
         this.player.move(moveVector);

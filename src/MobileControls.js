@@ -42,6 +42,7 @@ class MobileControls {
         }).setOrigin(0.5);
 
         this.container.add([this.base, this.stick, this.touchLabel]);
+        this.container.setVisible(false); // Oculto: El movimiento es 100% automático
 
         // Eventos táctiles y de puntero
         this.scene.input.on('pointerdown', (pointer) => {

@@ -9,9 +9,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;600;800&display=swap">
     <!-- Main Style -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=3.0">
     <!-- Phaser 3 Local Library -->
-    <script src="phaser.min.js"></script>
+    <script src="phaser.min.js?v=3.0"></script>
 </head>
 <body>
     <div id="app-wrapper">
@@ -26,13 +26,13 @@
                 <p class="game-subtitle">Demostración de Audio Urbano para Sistema Háptico</p>
                 
                 <div class="info-card">
-                    <p>🎯 <strong>Objetivo:</strong> Recorre la ciudad para activar sonidos de vehículos y sirenas.</p>
+                    <p>🎯 <strong>Modo Autocontrol:</strong> El personaje avanza solo por la ciudad.</p>
+                    <p>⏱️ Cada 7s se detiene 7s a escuchar un sonido (Claxon, Sirena o Alarma).</p>
                     <p>📱 Audios captados por la app Android para activar la pulsera háptica.</p>
-                    <p>♿ Diseñado para personas con discapacidad auditiva.</p>
                 </div>
 
                 <div class="menu-buttons">
-                    <button id="btn-start" class="btn btn-primary">▶ INICIAR JUEGO</button>
+                    <button id="btn-start" class="btn btn-primary">▶ INICIAR DEMO AUTOMÁTICA</button>
                     <button id="btn-restart" class="btn btn-secondary">🔄 REINICIAR DEMO</button>
                     <button id="btn-mute" class="btn btn-secondary">🔊 AUDIO: ACTIVADO</button>
                 </div>
@@ -40,18 +40,18 @@
         </div>
     </div>
 
-    <!-- Audios del usuario embebidos -->
-    <script src="assets/sounds/sounds-data.js"></script>
-    <!-- Game Scripts -->
-    <script src="src/InputManager.js"></script>
-    <script src="src/MobileControls.js"></script>
-    <script src="src/LoadingScene.js"></script>
-    <script src="src/MenuScene.js"></script>
-    <script src="src/Map.js"></script>
-    <script src="src/Player.js"></script>
-    <script src="src/AudioManager.js"></script>
-    <script src="src/GameScene.js"></script>
-    <script src="main.js"></script>
+    <!-- Audios del usuario embebidos con Cache-Busting -->
+    <script src="assets/sounds/sounds-data.js?v=3.0"></script>
+    <!-- Game Scripts con Cache-Busting -->
+    <script src="src/InputManager.js?v=3.0"></script>
+    <script src="src/MobileControls.js?v=3.0"></script>
+    <script src="src/LoadingScene.js?v=3.0"></script>
+    <script src="src/MenuScene.js?v=3.0"></script>
+    <script src="src/Map.js?v=3.0"></script>
+    <script src="src/Player.js?v=3.0"></script>
+    <script src="src/AudioManager.js?v=3.0"></script>
+    <script src="src/GameScene.js?v=3.0"></script>
+    <script src="main.js?v=3.0"></script>
 
     <!-- Escuchador táctil universal para móviles y tablets -->
     <script>
