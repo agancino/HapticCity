@@ -1,6 +1,6 @@
 /**
  * GameScene.js — Haptic City v2 (Autocontrol + 7s Encuentros + 3 Opciones Quiz)
- * - El personaje avanza AUTOMÁTICAMENTE por las calles de la ciudad.
+ * - El personaje avanza AUTOMÁTICAMENTE por la calle principal sin atoras.
  * - Cada 7 segundos de recorrido, se detiene durante 7 segundos exactos para escuchar el sonido.
  * - Quiz: "¿Qué sonido crees que sentiste?" con opciones: Claxon, Sirena, Alarma.
  */
@@ -25,9 +25,9 @@ class GameScene extends Phaser.Scene {
         // 2. Mapa
         this.cityMap = new CityMap(this);
 
-        // 3. Jugador en Bicicleta centrado en el Cruce Principal de la calle
+        // 3. Jugador en Bicicleta centrado en el Cruce Principal
         this.player = new Player(this, 624, 368);
-        this.physics.add.collider(this.player.sprite, this.cityMap.colliders);
+        // (Sin colisiones físicas para evitar que el autocontrol se atore)
 
         // 4. Entradas (manuales + auto)
         this.inputManager = new InputManager(this);
@@ -38,17 +38,10 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.player.sprite, true, 0.08, 0.08);
         this.cameras.main.setZoom(1.0);
 
-        // 6. Ruta de patrullaje automático EXCLUSIVA por el centro del asfalto de las calles
-        // Calle Horizontal: Y = 368 | Calle Vertical: X = 624
+        // 6. Ruta de recorrido automático continuo en línea recta por la calle (Y = 368)
         this.waypoints = [
-            { x: 624, y: 368 },  // 1. Cruce Principal
-            { x: 1150, y: 368 }, // 2. Extremo Este (Calle Horizontal)
-            { x: 624, y: 368 },  // 3. Volver al Cruce
-            { x: 624, y: 720 },  // 4. Extremo Sur (Calle Vertical)
-            { x: 624, y: 368 },  // 5. Volver al Cruce
-            { x: 120, y: 368 },  // 6. Extremo Oeste (Calle Horizontal)
-            { x: 624, y: 368 },  // 7. Volver al Cruce
-            { x: 624, y: 80 }    // 8. Extremo Norte (Calle Vertical)
+            { x: 1180, y: 368 }, // Ir a la Derecha (Este)
+            { x: 120, y: 368 }   // Ir a la Izquierda (Oeste)
         ];
         this.currentWaypointIndex = 0;
 
@@ -84,8 +77,8 @@ class GameScene extends Phaser.Scene {
         const dist = Math.sqrt(dx * dx + dy * dy);
 
         let moveVector = { x: 0, y: 0 };
-        if (dist < 20) {
-            // Llegó al punto, avanzar al siguiente punto de patrulla
+        if (dist < 25) {
+            // Llegó al extremo, cambiar de sentido
             this.currentWaypointIndex = (this.currentWaypointIndex + 1) % this.waypoints.length;
         } else {
             moveVector = { x: dx / dist, y: dy / dist };
@@ -335,7 +328,6 @@ class GameScene extends Phaser.Scene {
         const cardBg = this.add.rectangle(0, 0, cardW, 110, 0x0f172a, 0.97)
             .setStrokeStyle(3, borderColor);
 
-        const emoji = isCorrect ? '✅' : '❌';
         const msgText = this.add.text(0, -10, isCorrect ? '¡CORRECTO!' : 'INCORRECTO', {
             fontFamily: 'Arial, sans-serif',
             fontSize: '22px',
